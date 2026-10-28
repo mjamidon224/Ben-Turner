@@ -7,19 +7,25 @@ using System.IO;
 
 namespace TATimesheet
 {
-    /// <summary>Prints the same page layout the PDF uses (also drives Print Preview).</summary>
-    public class TimesheetPrintDocument : PrintDocument
+    /// <summary>Prints laid-out pages (the same ones the PDF uses); also drives Print Preview.</summary>
+    public class LayoutPrintDocument : PrintDocument
     {
         readonly List<LayoutPage> pages;
         readonly Image logo;
         int next;
 
-        public TimesheetPrintDocument(TimesheetSheet sheet, byte[] logoPng)
+        public LayoutPrintDocument(Func<int, int, List<LayoutPage>> build, byte[] logoPng, string name)
         {
             if (logoPng != null) logo = Image.FromStream(new MemoryStream(logoPng));
-            pages = SheetLayout.Build(sheet, logo != null ? logo.Width : 0, logo != null ? logo.Height : 0);
-            DocumentName = string.Format("{0} {1}", TimesheetSheet.Title, TimeUtil.FormatDate(sheet.Period.Start));
+            pages = build(logo != null ? logo.Width : 0, logo != null ? logo.Height : 0);
+            DocumentName = name;
             DefaultPageSettings.Landscape = true;
+        }
+
+        public static LayoutPrintDocument ForSheet(TimesheetSheet sheet, byte[] logoPng)
+        {
+            return new LayoutPrintDocument((w, h) => SheetLayout.Build(sheet, w, h), logoPng,
+                string.Format("{0} {1}", TimesheetSheet.Title, TimeUtil.FormatDate(sheet.Period.Start)));
         }
 
         protected override void OnBeginPrint(PrintEventArgs e)
@@ -47,33 +53,48 @@ namespace TATimesheet
             float scale = Math.Min(1f, Math.Min(pageW / SheetLayout.PageW, pageH / SheetLayout.PageH));
             if (scale < 1f) g.ScaleTransform(scale, scale);
 
-            Draw(g, pages[next], logo);
+            if (pages.Count > 0) Draw(g, pages[next].Ops, logo, PdfExporter.PrintColor, "Arial", false);
             next++;
             e.HasMorePages = next < pages.Count;
         }
 
-        /// <summary>Draws a page; the Graphics transform must map one world unit to one point.</summary>
-        public static void Draw(Graphics g, LayoutPage page, Image logo)
+        /// <summary>
+        /// Draws ops; the Graphics transform must map one world unit to one layout unit
+        /// (points on paper, pixels on screen). Rounded bar ends are for the screen only.
+        /// </summary>
+        public static void Draw(Graphics g, IEnumerable<DrawOp> ops, Image logo, Func<Ink, Color> color, string fontName, bool roundEnds)
         {
-            using (var regular = new FontFamily("Arial"))
+            using (var family = new FontFamily(fontName))
             using (var format = (StringFormat)StringFormat.GenericTypographic.Clone())
             {
-                format.FormatFlags |= StringFormatFlags.NoWrap;
-                foreach (var op in page.Ops)
+                format.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.MeasureTrailingSpaces;
+                foreach (var op in ops)
                 {
                     var img = op as ImageOp;
-                    if (img != null && logo != null)
+                    if (img != null)
                     {
-                        g.DrawImage(logo, img.X, img.Y, img.W, img.H);
+                        if (logo != null) g.DrawImage(logo, img.X, img.Y, img.W, img.H);
                         continue;
                     }
                     var line = op as LineOp;
                     if (line != null)
                     {
-                        using (var pen = new Pen(Color.Black, line.Width))
+                        using (var pen = new Pen(color(line.Ink), line.Width))
                         {
                             pen.StartCap = pen.EndCap = LineCap.Square;
                             g.DrawLine(pen, line.X1, line.Y1, line.X2, line.Y2);
+                        }
+                        continue;
+                    }
+                    var fill = op as FillOp;
+                    if (fill != null)
+                    {
+                        using (var brush = new SolidBrush(color(fill.Ink)))
+                        {
+                            if (roundEnds && (fill.RoundTop || fill.RoundRight))
+                                using (var path = RoundedEnd(fill)) g.FillPath(brush, path);
+                            else
+                                g.FillRectangle(brush, fill.X, fill.Y, fill.W, fill.H);
                         }
                         continue;
                     }
@@ -81,14 +102,50 @@ namespace TATimesheet
                     if (text != null)
                     {
                         var style = text.Bold ? FontStyle.Bold : FontStyle.Regular;
-                        using (var font = new Font(regular, text.Size, style, GraphicsUnit.World))
+                        using (var font = new Font(family, text.Size, style, GraphicsUnit.World))
+                        using (var brush = new SolidBrush(color(text.Ink)))
                         {
-                            float ascent = text.Size * regular.GetCellAscent(style) / regular.GetEmHeight(style);
-                            g.DrawString(text.Text, font, Brushes.Black, text.X, text.Y - ascent, format);
+                            float ascent = text.Size * family.GetCellAscent(style) / family.GetEmHeight(style);
+                            float x = text.X;
+                            if (text.Align != TextAnchor.Left)
+                            {
+                                float w = g.MeasureString(text.Text, font, PointF.Empty, format).Width;
+                                x -= text.Align == TextAnchor.Center ? w / 2 : w;
+                            }
+                            g.DrawString(text.Text, font, brush, x, text.Y - ascent, format);
                         }
                     }
                 }
             }
+        }
+
+        /// <summary>A bar with a 4-unit rounded data end and a square baseline end.</summary>
+        static GraphicsPath RoundedEnd(FillOp f)
+        {
+            var p = new GraphicsPath();
+            float r = Math.Min(4f, Math.Min(f.W, f.H) / 2f);
+            if (r < 0.5f)
+            {
+                p.AddRectangle(new RectangleF(f.X, f.Y, f.W, f.H));
+                return p;
+            }
+            float d = 2 * r;
+            if (f.RoundTop)
+            {
+                p.AddLine(f.X, f.Y + f.H, f.X, f.Y + r);
+                p.AddArc(f.X, f.Y, d, d, 180, 90);
+                p.AddArc(f.X + f.W - d, f.Y, d, d, 270, 90);
+                p.AddLine(f.X + f.W, f.Y + r, f.X + f.W, f.Y + f.H);
+            }
+            else
+            {
+                p.AddLine(f.X, f.Y, f.X + f.W - r, f.Y);
+                p.AddArc(f.X + f.W - d, f.Y, d, d, 270, 90);
+                p.AddArc(f.X + f.W - d, f.Y + f.H - d, d, d, 0, 90);
+                p.AddLine(f.X + f.W - r, f.Y + f.H, f.X, f.Y + f.H);
+            }
+            p.CloseFigure();
+            return p;
         }
 
         protected override void Dispose(bool disposing)

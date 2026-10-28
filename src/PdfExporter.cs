@@ -18,16 +18,21 @@ namespace TATimesheet
     {
         public static void Export(TimesheetSheet sheet, byte[] logoPng, string path)
         {
+            string title = string.Format("{0} {1} - {2}", TimesheetSheet.Title,
+                TimeUtil.FormatDate(sheet.Period.Start), TimeUtil.FormatDate(sheet.Period.End));
+            ExportPages((w, h) => SheetLayout.Build(sheet, w, h), logoPng, path, title, sheet.Name);
+        }
+
+        /// <summary>Writes laid-out pages; build gets the logo's pixel size so it can keep its shape.</summary>
+        public static void ExportPages(Func<int, int, List<LayoutPage>> build, byte[] logoPng, string path, string title, string author)
+        {
             int lw = 0, lh = 0;
             byte[] jpeg = null;
             if (logoPng != null) jpeg = ToJpeg(logoPng, out lw, out lh);
-            var pages = SheetLayout.Build(sheet, lw, lh);
-            string title = string.Format("{0} {1} - {2}", TimesheetSheet.Title,
-                TimeUtil.FormatDate(sheet.Period.Start), TimeUtil.FormatDate(sheet.Period.End));
-
+            var pages = build(lw, lh);
             string tmp = path + ".writing";
             using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write))
-                Write(fs, pages, jpeg, lw, lh, title, sheet.Name);
+                Write(fs, pages, jpeg, lw, lh, title, author);
             DocxExporter.ReplaceFile(tmp, path);
         }
 
@@ -58,6 +63,24 @@ namespace TATimesheet
                     }
                 }
             }
+        }
+
+        /// <summary>Print colors for each ink (the same ones the printer path uses).</summary>
+        public static System.Drawing.Color PrintColor(Ink ink)
+        {
+            switch (ink)
+            {
+                case Ink.Muted: return System.Drawing.Color.FromArgb(96, 104, 110);
+                case Ink.Grid: return System.Drawing.Color.FromArgb(214, 218, 221);
+                case Ink.Bar: return System.Drawing.Color.FromArgb(18, 160, 58);
+                default: return System.Drawing.Color.Black;
+            }
+        }
+
+        static string Rgb(Ink ink)
+        {
+            var c = PrintColor(ink);
+            return string.Format("{0} {1} {2}", N(c.R / 255f), N(c.G / 255f), N(c.B / 255f));
         }
 
         static string N(float v)
@@ -100,15 +123,26 @@ namespace TATimesheet
                     var line = op as LineOp;
                     if (line != null)
                     {
-                        Ascii(s, string.Format("{0} w {1} {2} m {3} {4} l S\n", N(line.Width),
+                        Ascii(s, string.Format("{0} RG {1} w {2} {3} m {4} {5} l S\n", Rgb(line.Ink), N(line.Width),
                             N(line.X1), N(SheetLayout.PageH - line.Y1), N(line.X2), N(SheetLayout.PageH - line.Y2)));
+                        continue;
+                    }
+                    var fill = op as FillOp;
+                    if (fill != null)
+                    {
+                        Ascii(s, string.Format("{0} rg {1} {2} {3} {4} re f\n", Rgb(fill.Ink),
+                            N(fill.X), N(SheetLayout.PageH - fill.Y - fill.H), N(fill.W), N(fill.H)));
                         continue;
                     }
                     var text = op as TextOp;
                     if (text != null)
                     {
-                        Ascii(s, string.Format("BT /{0} {1} Tf 1 0 0 1 {2} {3} Tm ", text.Bold ? "F2" : "F1",
-                            N(text.Size), N(text.X), N(SheetLayout.PageH - text.Y)));
+                        float x = text.X;
+                        float w = Fonts.Width(text.Text, text.Bold, text.Size);
+                        if (text.Align == TextAnchor.Center) x -= w / 2;
+                        else if (text.Align == TextAnchor.Right) x -= w;
+                        Ascii(s, string.Format("{0} rg BT /{1} {2} Tf 1 0 0 1 {3} {4} Tm ", Rgb(text.Ink), text.Bold ? "F2" : "F1",
+                            N(text.Size), N(x), N(SheetLayout.PageH - text.Y)));
                         PdfString(s, text.Text);
                         Ascii(s, " Tj ET\n");
                     }

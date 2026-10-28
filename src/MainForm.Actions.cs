@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -9,7 +10,7 @@ using System.Windows.Forms;
 namespace TATimesheet
 {
     /// <summary>Menu and button actions: exports, printing, imports, backups, dialogs.</summary>
-    public partial class MainForm
+    public partial class MainForm : IReportHost
     {
         // ---- Exports ----------------------------------------------------------------------------
 
@@ -38,6 +39,11 @@ namespace TATimesheet
 
         string AskSavePath(string title, string filter, string fileName)
         {
+            return AskSavePath(this, title, filter, fileName);
+        }
+
+        public string AskSavePath(IWin32Window owner, string title, string filter, string fileName)
+        {
             using (var dlg = new SaveFileDialog())
             {
                 dlg.Title = title;
@@ -46,7 +52,7 @@ namespace TATimesheet
                 dlg.InitialDirectory = ExportFolder();
                 dlg.OverwritePrompt = true;
                 dlg.AddExtension = true;
-                if (dlg.ShowDialog(this) != DialogResult.OK) return null;
+                if (dlg.ShowDialog(owner) != DialogResult.OK) return null;
                 data.Settings.ExportFolder = Path.GetDirectoryName(dlg.FileName);
                 return dlg.FileName;
             }
@@ -54,27 +60,37 @@ namespace TATimesheet
 
         void RunExport(string path, Action write)
         {
+            RunExport(this, path, write);
+        }
+
+        public void RunExport(IWin32Window owner, string path, Action write)
+        {
             try
             {
-                Cursor = Cursors.WaitCursor;
+                Cursor.Current = Cursors.WaitCursor;
                 write();
             }
             catch (IOException ex)
             {
-                Ui.Error(this, "Couldn't write " + Path.GetFileName(path) + ".\n\nIf it's open in Word, Excel or a PDF viewer, close it and try again.\n\n(" + ex.Message + ")");
+                Ui.Error(owner, "Couldn't write " + Path.GetFileName(path) + ".\n\nIf it's open in Word, Excel or a PDF viewer, close it and try again.\n\n(" + ex.Message + ")");
                 return;
             }
             catch (UnauthorizedAccessException ex)
             {
-                Ui.Error(this, "Windows won't let me write there. Pick another folder.\n\n(" + ex.Message + ")");
+                Ui.Error(owner, "Windows won't let me write there. Pick another folder.\n\n(" + ex.Message + ")");
                 return;
             }
             finally
             {
-                Cursor = Cursors.Default;
+                Cursor.Current = Cursors.Default;
             }
             Persist("Exported " + Path.GetFileName(path));
             if (data.Settings.OpenAfterExport) OpenPath(path);
+        }
+
+        public byte[] LogoPng()
+        {
+            return CustomLogoOrNull() ?? AppResources.DefaultLogoPng();
         }
 
         byte[] CustomLogoOrNull()
@@ -129,14 +145,18 @@ namespace TATimesheet
             else RunExport(path, () => DataExporters.ExportCsv(data, from, to, path));
         }
 
-        TimesheetPrintDocument PrintDocumentForPeriod()
+        LayoutPrintDocument PrintDocumentForPeriod()
         {
-            return new TimesheetPrintDocument(CurrentSheet(), CustomLogoOrNull() ?? AppResources.DefaultLogoPng());
+            return LayoutPrintDocument.ForSheet(CurrentSheet(), LogoPng());
         }
 
         void PrintPreview()
         {
-            using (var doc = PrintDocumentForPeriod())
+            using (var doc = PrintDocumentForPeriod()) ShowPreview(this, doc, period.ToString());
+        }
+
+        public void ShowPreview(IWin32Window owner, System.Drawing.Printing.PrintDocument doc, string title)
+        {
             using (var dlg = new PrintPreviewDialog())
             {
                 dlg.Document = doc;
@@ -144,10 +164,10 @@ namespace TATimesheet
                 dlg.Width = Math.Min(1200, Screen.FromControl(this).WorkingArea.Width - 80);
                 dlg.Height = Math.Min(900, Screen.FromControl(this).WorkingArea.Height - 80);
                 dlg.StartPosition = FormStartPosition.CenterParent;
-                dlg.Text = "Print preview \u2013 " + period;
+                dlg.Text = "Print preview \u2013 " + title;
                 // The preview's own toolbar icons are dark; keep that toolbar light in dark mode.
                 foreach (var bar in dlg.Controls.OfType<ToolStrip>()) bar.Renderer = new ToolStripProfessionalRenderer();
-                dlg.ShowDialog(this);
+                dlg.ShowDialog(owner);
             }
         }
 
@@ -160,6 +180,97 @@ namespace TATimesheet
                 dlg.UseEXDialog = true;
                 if (dlg.ShowDialog(this) == DialogResult.OK) doc.Print();
             }
+        }
+
+        // ---- Reports ----------------------------------------------------------------------------
+
+        void ShowReports()
+        {
+            CommitHeader();
+            using (var dlg = new ReportsForm(data, this)) dlg.ShowDialog(this);
+            // Reports never change entries, but they may remember an export folder.
+            try { store.Save(data); } catch (Exception) { }
+        }
+
+        public void OpenPeriodAt(DateTime date)
+        {
+            GoToPeriod(Period.Containing(date, data.Settings));
+        }
+
+        /// <summary>Writes the customer timesheet for every pay period in the range that has entries.</summary>
+        public void SaveAllTimesheets(IWin32Window owner, DateTime from, DateTime to, bool pdf)
+        {
+            var periods = new List<Period>();
+            for (var p = Period.Containing(from, data.Settings); p.Start <= to; p = p.Next)
+                if (data.Entries.Any(e => p.Contains(e.Date))) periods.Add(p);
+            if (periods.Count == 0)
+            {
+                Ui.Info(owner, "There are no entries in that range, so there's nothing to save.");
+                return;
+            }
+
+            string folder;
+            using (var dlg = new FolderBrowserDialog())
+            {
+                dlg.Description = string.Format("Pick a folder for {0} {1} timesheet{2}.", periods.Count, pdf ? "PDF" : "Word", periods.Count == 1 ? "" : "s");
+                dlg.SelectedPath = ExportFolder();
+                if (dlg.ShowDialog(owner) != DialogResult.OK) return;
+                folder = dlg.SelectedPath;
+            }
+
+            string ext = pdf ? ".pdf" : ".docx";
+            Func<Period, string> pathFor = p => Path.Combine(folder, data.Settings.FilePrefix + p.Start.ToString("MMddyy", CultureInfo.InvariantCulture) + ext);
+            int existing = periods.Count(p => File.Exists(pathFor(p)));
+            bool overwrite = true;
+            if (existing > 0)
+            {
+                var answer = MessageBox.Show(owner, string.Format("{0} of these files already exist in that folder.\n\nYes = replace them\nNo = keep them and only add the missing ones", existing),
+                    "Files already there", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (answer == DialogResult.Cancel) return;
+                overwrite = answer == DialogResult.Yes;
+            }
+
+            byte[] customLogo = CustomLogoOrNull();
+            byte[] logo = customLogo ?? AppResources.DefaultLogoPng();
+            int written = 0, skipped = 0;
+            var failed = new List<string>();
+            Cursor.Current = Cursors.WaitCursor;
+            try
+            {
+                foreach (var p in periods)
+                {
+                    string path = pathFor(p);
+                    if (!overwrite && File.Exists(path)) { skipped++; continue; }
+                    var h = data.HeaderFor(p) ?? data.DefaultHeaderFor(p);
+                    var sheet = TimesheetSheet.Build(data, p, h.Name, h.Customer);
+                    try
+                    {
+                        if (pdf) PdfExporter.Export(sheet, logo, path);
+                        else DocxExporter.Export(sheet, path, customLogo);
+                        written++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed.Add(Path.GetFileName(path) + ": " + ex.Message);
+                    }
+                }
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+
+            data.Settings.ExportFolder = folder;
+            string msg = string.Format("Saved {0} timesheet{1} to\n{2}", written, written == 1 ? "" : "s", folder);
+            if (skipped > 0) msg += string.Format("\n\nKept {0} that were already there.", skipped);
+            if (failed.Count > 0) msg += "\n\nCouldn't write (open in another program?):\n" + string.Join("\n", failed);
+            Ui.Info(owner, msg);
+            if (written > 0) OpenFolder(folder);
+        }
+
+        static void OpenFolder(string folder)
+        {
+            try { Process.Start("explorer.exe", "\"" + folder + "\""); } catch (Exception) { }
         }
 
         static void OpenPath(string path)
@@ -389,6 +500,11 @@ namespace TATimesheet
                 "  Word timesheet = the exact customer timesheet you used to make by hand (TA_Timesheet_MMDDYY.docx).\n" +
                 "  PDF = same thing, ready to email. Print... = preview and print.\n" +
                 "  Excel / CSV = all your entries for any date range, with totals by project and week.\n\n" +
+                "TRAVEL, WEEKLY / BI-WEEKLY, REPORTS\n" +
+                "  Tick Travel for travel time. It shows as \"(Travel)\" under the location on the timesheet.\n" +
+                "  The Weekly / Bi-weekly box next to \"This period\" sets how much each timesheet covers.\n" +
+                "  Reports (Ctrl+R): hours for any range by pay period, week, month, year, project, location or\n" +
+                "  customer, with PDF/Excel/CSV/print, and \"Save every timesheet\" to rebuild old timesheets in one go.\n\n" +
                 "LIGHT / DARK\n" +
                 "  View menu: Light, Dark, or Match Windows (follows your Windows setting).\n\n" +
                 "SHORTCUTS\n" +

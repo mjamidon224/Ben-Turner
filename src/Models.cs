@@ -15,6 +15,7 @@ namespace TATimesheet
         public string End = "";     // "HH:mm" or empty
         public double? Hours;       // what gets billed; normally End - Start, but can be typed by hand
         public string Notes = "";   // private notes, never printed on the customer timesheet
+        public bool Travel;         // travelling rather than on site; marked "(Travel)" on the timesheet
 
         public TimeEntry Clone()
         {
@@ -67,7 +68,7 @@ namespace TATimesheet
     public class AppSettings
     {
         public string DefaultName = "";
-        public int PeriodWeeks = 2;
+        public int PeriodWeeks = 2;           // 1 = weekly, 2 = bi-weekly timesheets
         public DateTime PeriodAnchor = new DateTime(2026, 10, 26); // a Monday that starts a pay period
         public int TimeStepMinutes = 15;
         public string ExportFolder = "";

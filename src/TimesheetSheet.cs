@@ -26,6 +26,7 @@ namespace TATimesheet
     {
         public const string Title = "Customer Timesheet";
         public const string ContinuedTitle = "Customer Timesheet Continued";
+        public const string TravelMark = "(Travel)";
 
         public string Name = "";
         public string Customer = "";
@@ -56,7 +57,7 @@ namespace TATimesheet
                         {
                             Date = date,
                             Project = e.Project,
-                            Location = e.Location,
+                            Location = e.Travel ? (e.Location.Length > 0 ? e.Location + "\n" : "") + TravelMark : e.Location,
                             Start = e.Start,
                             End = e.End,
                             Hours = TimeUtil.FormatHours(e.Hours)

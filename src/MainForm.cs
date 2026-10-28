@@ -29,6 +29,9 @@ namespace TATimesheet
         ThemedDatePicker dtpDate;
         ComboBox cboProject, cboLocation, cboStart, cboEnd;
         TextBox txtHours, txtNotes;
+        CheckBox chkTravel;
+        ComboBox cboLength;
+        readonly List<ToolStripMenuItem> lengthItems = new List<ToolStripMenuItem>();
         Button btnSave, btnNew, btnDelete;
         Label lblMode, lblHint;
 
@@ -54,7 +57,7 @@ namespace TATimesheet
             totalFont = new Font("Segoe UI Semibold", 9F);
             Text = BuildInfo.IsTest ? "TA Timesheet \u2013 TEST COPY (practice data)" : "TA Timesheet";
             Icon = AppResources.AppIcon();
-            MinimumSize = new Size(900, 560);
+            MinimumSize = new Size(1020, 560);
             Size = new Size(1200, 800);
             StartPosition = FormStartPosition.CenterScreen;
             Load += (s, e) =>
@@ -141,13 +144,18 @@ namespace TATimesheet
             today.Anchor = AnchorStyles.Left;
             tips.SetToolTip(today, "Jump back to the pay period with today in it (Ctrl+T)");
 
-            dtpJump = new ThemedDatePicker { Format = DateTimePickerFormat.Short, Width = 120, Anchor = AnchorStyles.Left, Margin = new Padding(10, 3, 3, 3) };
-            tips.SetToolTip(dtpJump, "Jump to the pay period containing this date");
+            dtpJump = new ThemedDatePicker { Format = DateTimePickerFormat.Short, Width = 108, Anchor = AnchorStyles.Left, Margin = new Padding(6, 3, 3, 3) };
+            tips.SetToolTip(dtpJump, "Go to: jump to the pay period containing this date");
             dtpJump.DropDown += (s, e) => jumpDropped = true;
             dtpJump.CloseUp += (s, e) => { jumpDropped = false; JumpToPicked(); };
             dtpJump.ValueChanged += (s, e) => { if (!jumpDropped) JumpToPicked(); };
 
-            left.Controls.AddRange(new Control[] { prev, lblPeriod, next, today, Ui.InlineLabel("Go to"), dtpJump });
+            cboLength = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 92, Anchor = AnchorStyles.Left, Margin = new Padding(6, 3, 3, 3) };
+            cboLength.Items.AddRange(new object[] { "Weekly", "Bi-weekly" });
+            cboLength.SelectedIndexChanged += (s, e) => { if (suppress == 0) SetPeriodWeeks(cboLength.SelectedIndex + 1); };
+            tips.SetToolTip(cboLength, "How much each timesheet covers: one week or two");
+
+            left.Controls.AddRange(new Control[] { prev, lblPeriod, next, today, cboLength, dtpJump });
 
             var right = Ui.Flow();
             cboName = Ui.HistoryCombo();
@@ -168,6 +176,20 @@ namespace TATimesheet
 
             t.Controls.Add(left, 0, 0);
             t.Controls.Add(right, 2, 0);
+
+            // Name/Customer give up width first when the window is narrow, so nothing gets cut off.
+            // Re-fit when the window resizes and when the period label changes the left side's width.
+            EventHandler fit = (s, e) =>
+            {
+                int labels = right.PreferredSize.Width - cboName.Width - cboCustomer.Width;
+                int room = t.ClientSize.Width - left.PreferredSize.Width - labels - 12;
+                float dpi;
+                using (var g = t.CreateGraphics()) dpi = g.DpiX / 96f;
+                cboName.Width = Math.Max((int)(110 * dpi), Math.Min((int)(200 * dpi), room * 45 / 100));
+                cboCustomer.Width = Math.Max((int)(130 * dpi), Math.Min((int)(240 * dpi), room * 55 / 100));
+            };
+            t.Resize += fit;
+            left.SizeChanged += fit;
             return t;
         }
 
@@ -179,7 +201,7 @@ namespace TATimesheet
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 7,
+                ColumnCount = 8,
                 RowCount = 4,
                 Padding = new Padding(10, 8, 10, 8),
                 Margin = new Padding(0, 0, 0, 10)
@@ -190,6 +212,7 @@ namespace TATimesheet
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72));
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
             for (int i = 0; i < 4; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -200,9 +223,9 @@ namespace TATimesheet
                 Margin = new Padding(3, 0, 3, 2)
             }, ThemeRole.Heading);
             t.Controls.Add(lblEditorTitle, 0, 0);
-            t.SetColumnSpan(lblEditorTitle, 7);
+            t.SetColumnSpan(lblEditorTitle, 8);
 
-            string[] labels = { "Date", "Project", "Location", "Start", "End", "Hours", "Notes (just for you, not printed)" };
+            string[] labels = { "Date", "Project", "Location", "Start", "End", "Hours", "", "Notes (just for you, not printed)" };
             for (int i = 0; i < labels.Length; i++) t.Controls.Add(Ui.FieldLabel(labels[i]), i, 1);
 
             dtpDate = new ThemedDatePicker
@@ -229,6 +252,8 @@ namespace TATimesheet
             txtHours.TextChanged += (s, e) => UpdateHint();
             tips.SetToolTip(txtHours, "Filled in from Start/End. Type over it if you bill something different.");
             txtNotes = new TextBox { Dock = DockStyle.Fill, Margin = new Padding(3, 1, 3, 3) };
+            chkTravel = new CheckBox { Text = "Travel", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(8, 0, 6, 3) };
+            tips.SetToolTip(chkTravel, "Travel time (driving/flying) instead of on-site work. Shows as \"(Travel)\" on the customer timesheet.");
 
             t.Controls.Add(dtpDate, 0, 2);
             t.Controls.Add(cboProject, 1, 2);
@@ -236,7 +261,8 @@ namespace TATimesheet
             t.Controls.Add(cboStart, 3, 2);
             t.Controls.Add(cboEnd, 4, 2);
             t.Controls.Add(txtHours, 5, 2);
-            t.Controls.Add(txtNotes, 6, 2);
+            t.Controls.Add(chkTravel, 6, 2);
+            t.Controls.Add(txtNotes, 7, 2);
 
             var buttons = Ui.Flow();
             buttons.Dock = DockStyle.Fill;
@@ -253,7 +279,7 @@ namespace TATimesheet
             lblHint = Theme.SetRole(new Label { AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) }, ThemeRole.Warn);
             buttons.Controls.AddRange(new Control[] { btnSave, btnNew, btnDelete, copyLast, lblMode, lblHint });
             t.Controls.Add(buttons, 0, 3);
-            t.SetColumnSpan(buttons, 7);
+            t.SetColumnSpan(buttons, 8);
             return t;
         }
 
@@ -348,7 +374,8 @@ namespace TATimesheet
             AddColumn("Start", 7, true);
             AddColumn("End", 7, true);
             AddColumn("Hours", 7, true);
-            AddColumn("Notes", 26, false);
+            AddColumn("Travel", 6, true);
+            AddColumn("Notes", 24, false);
 
             // React to clicks and arrow keys only: the grid also moves its selection on its own
             // (e.g. when it first shows), and that must not replace what's in the editor.
@@ -415,6 +442,10 @@ namespace TATimesheet
 
             var exports = Ui.Flow();
             exports.Anchor = AnchorStyles.Right;
+            var reports = Ui.Button("Reports...", (s, e) => ShowReports());
+            reports.Margin = new Padding(3, 3, 18, 3);
+            tips.SetToolTip(reports, "Hours over any range by pay period, week, month, year, project, location or customer (Ctrl+R)");
+            exports.Controls.Add(reports);
             exports.Controls.Add(Ui.InlineLabel("Export:"));
             var word = Ui.PrimaryButton("Word timesheet", (s, e) => ExportWord());
             var pdf = Ui.PrimaryButton("PDF", (s, e) => ExportPdf());
@@ -470,6 +501,15 @@ namespace TATimesheet
             per.DropDownItems.Add(Item("&Previous pay period", Keys.Control | Keys.PageUp, () => MovePeriod(-1)));
             per.DropDownItems.Add(Item("&Next pay period", Keys.Control | Keys.PageDown, () => MovePeriod(1)));
             per.DropDownItems.Add(Item("&This pay period", Keys.Control | Keys.T, () => GoToPeriod(Period.Containing(DateTime.Today, data.Settings))));
+            per.DropDownItems.Add(new ToolStripSeparator());
+            for (int weeks = 1; weeks <= 2; weeks++)
+            {
+                int n = weeks;
+                var item = Item(n == 1 ? "&Weekly timesheets" : "&Bi-weekly timesheets", Keys.None, () => SetPeriodWeeks(n));
+                item.Tag = n;
+                lengthItems.Add(item);
+                per.DropDownItems.Add(item);
+            }
 
             var export = new ToolStripMenuItem("E&xport");
             export.DropDownItems.Add(Item("&Word timesheet (.docx)...", Keys.Control | Keys.E, ExportWord));
@@ -492,6 +532,7 @@ namespace TATimesheet
             }
 
             var tools = new ToolStripMenuItem("&Tools");
+            tools.DropDownItems.Add(Item("&Reports...", Keys.Control | Keys.R, ShowReports));
             tools.DropDownItems.Add(Item("Manage &dropdown history...", Keys.Control | Keys.H, ManageHistory));
             tools.DropDownItems.Add(Item("&Settings...", Keys.None, ShowSettings));
 
@@ -580,6 +621,8 @@ namespace TATimesheet
             try
             {
                 lblPeriod.Text = PeriodTitle(period);
+                cboLength.SelectedIndex = Math.Max(0, Math.Min(1, data.Settings.PeriodWeeks - 1));
+                foreach (var item in lengthItems) item.Checked = (int)item.Tag == data.Settings.PeriodWeeks;
                 if (dtpJump.Value.Date < period.Start || dtpJump.Value.Date > period.End)
                     dtpJump.Value = period.Contains(DateTime.Today) ? DateTime.Today : period.Start;
                 var h = data.HeaderFor(period) ?? data.DefaultHeaderFor(period);
@@ -595,6 +638,16 @@ namespace TATimesheet
                 suppress--;
             }
             if (resetEditor) NewEntry(SuggestedDate());
+        }
+
+        /// <summary>Switches between weekly (1) and bi-weekly (2) timesheets.</summary>
+        void SetPeriodWeeks(int weeks)
+        {
+            if (weeks == data.Settings.PeriodWeeks) return;
+            data.Settings.PeriodWeeks = weeks;
+            period = Period.Containing(period.Contains(DateTime.Today) ? DateTime.Today : period.Start, data.Settings);
+            Persist(weeks == 1 ? "Switched to weekly timesheets" : "Switched to bi-weekly timesheets");
+            LoadPeriod(true);
         }
 
         void MovePeriod(int direction)
@@ -664,9 +717,10 @@ namespace TATimesheet
                 grid.Rows.Clear();
                 var entries = data.Entries.Where(e => period.Contains(e.Date)).ToList();
                 var weekTotals = new List<double>();
+                double allTravel = 0;
                 for (int w = 0; w < period.Weeks; w++)
                 {
-                    double total = 0;
+                    double total = 0, travel = 0;
                     for (int d = 0; d < 7; d++)
                     {
                         DateTime date = period.WeekStart(w).AddDays(d);
@@ -676,19 +730,23 @@ namespace TATimesheet
                         {
                             AddEntryRow(e);
                             total += e.Hours ?? 0;
+                            if (e.Travel) travel += e.Hours ?? 0;
                         }
                     }
                     total = Math.Round(total, 2);
                     weekTotals.Add(total);
-                    AddTotalRow(w + 1, total);
+                    allTravel += travel;
+                    AddTotalRow(w + 1, total, Math.Round(travel, 2));
                 }
                 grid.ClearSelection();
                 grid.CurrentCell = null;
 
                 double all = Math.Round(weekTotals.Sum(), 2);
                 lblTotal.Text = "Total " + TimeUtil.FormatHours(all) + " h";
-                lblWeeks.Text = period.Weeks == 1 ? "" : string.Join("     ",
-                    weekTotals.Select((t, i) => string.Format("Week {0}: {1} h", i + 1, TimeUtil.FormatHours(t))));
+                var parts = period.Weeks == 1 ? new List<string>()
+                    : weekTotals.Select((t, i) => string.Format("Week {0}: {1} h", i + 1, TimeUtil.FormatHours(t))).ToList();
+                if (allTravel > 0) parts.Add(string.Format("incl. {0} h travel", TimeUtil.FormatHours(Math.Round(allTravel, 2))));
+                lblWeeks.Text = string.Join("     ", parts);
             }
             finally
             {
@@ -700,7 +758,7 @@ namespace TATimesheet
         void AddEntryRow(TimeEntry e)
         {
             int i = grid.Rows.Add(e.Date.ToString("ddd", CultureInfo.CurrentCulture), TimeUtil.FormatDate(e.Date),
-                e.Project, e.Location, e.Start, e.End, TimeUtil.FormatHours(e.Hours), e.Notes);
+                e.Project, e.Location, e.Start, e.End, TimeUtil.FormatHours(e.Hours), e.Travel ? "\u2713" : "", e.Notes);
             var row = grid.Rows[i];
             row.Tag = e;
             if (e.Date == DateTime.Today) row.Cells[1].Style.Font = boldFont;
@@ -717,7 +775,7 @@ namespace TATimesheet
 
         void AddEmptyDayRow(DateTime date)
         {
-            int i = grid.Rows.Add(date.ToString("ddd", CultureInfo.CurrentCulture), TimeUtil.FormatDate(date), "click to add", "", "", "", "", "");
+            int i = grid.Rows.Add(date.ToString("ddd", CultureInfo.CurrentCulture), TimeUtil.FormatDate(date), "click to add", "", "", "", "", "", "");
             var row = grid.Rows[i];
             row.Tag = date;
             row.DefaultCellStyle.ForeColor = Theme.Current.Muted;
@@ -728,9 +786,10 @@ namespace TATimesheet
             if (date == DateTime.Today) row.Cells[1].Style.Font = boldFont;
         }
 
-        void AddTotalRow(int week, double hours)
+        void AddTotalRow(int week, double hours, double travel)
         {
-            int i = grid.Rows.Add("", "", period.Weeks == 1 ? "Week total" : "Week " + week + " total", "", "", "", TimeUtil.FormatHours(hours), "");
+            int i = grid.Rows.Add("", "", period.Weeks == 1 ? "Week total" : "Week " + week + " total", "", "", "", TimeUtil.FormatHours(hours),
+                travel > 0 ? TimeUtil.FormatHours(travel) + " h" : "", "");
             var row = grid.Rows[i];
             row.Tag = "total";
             row.DefaultCellStyle.BackColor = Theme.Current.AccentTint;
@@ -814,6 +873,7 @@ namespace TATimesheet
                     }
                 }
                 txtNotes.Text = "";
+                chkTravel.Checked = false;
                 txtHours.Text = TimeUtil.FormatHours(TimeUtil.ComputeHours(cboStart.Text, cboEnd.Text));
                 ResetInputColors();
             }
@@ -839,6 +899,7 @@ namespace TATimesheet
                 cboEnd.Text = e.End;
                 txtHours.Text = TimeUtil.FormatHours(e.Hours);
                 txtNotes.Text = e.Notes;
+                chkTravel.Checked = e.Travel;
                 ResetInputColors();
             }
             finally
@@ -910,6 +971,7 @@ namespace TATimesheet
             cboStart.Text = last.Start;
             cboEnd.Text = last.End;
             txtHours.Text = TimeUtil.FormatHours(last.ComputedHours ?? last.Hours);
+            chkTravel.Checked = last.Travel;
             lblStatus.Text = "Copied from " + last.Date.ToString("ddd M/d", CultureInfo.CurrentCulture) + ".";
         }
 
@@ -968,7 +1030,8 @@ namespace TATimesheet
                 Start = start,
                 End = end,
                 Hours = hours,
-                Notes = txtNotes.Text.Trim()
+                Notes = txtNotes.Text.Trim(),
+                Travel = chkTravel.Checked
             };
             if (e.IsBlank)
             {
@@ -995,6 +1058,7 @@ namespace TATimesheet
                 editing.End = e.End;
                 editing.Hours = e.Hours;
                 editing.Notes = e.Notes;
+                editing.Travel = e.Travel;
                 e = editing;
             }
 

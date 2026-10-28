@@ -177,12 +177,16 @@ namespace TATimesheet
             else
                 b.Append("<w:tcBorders><w:top w:val=\"nil\"/><w:left w:val=\"nil\"/><w:bottom w:val=\"nil\"/><w:right w:val=\"nil\"/></w:tcBorders>");
             b.Append("<w:vAlign w:val=\"center\"/></w:tcPr>");
-            b.Append("<w:p><w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/>");
-            if (center) b.Append("<w:jc w:val=\"center\"/>");
-            b.Append(RunProps(bold)).Append("</w:pPr>");
-            if (!string.IsNullOrEmpty(text))
-                b.Append("<w:r>").Append(RunProps(bold)).Append("<w:t xml:space=\"preserve\">").Append(Esc(text)).Append("</w:t></w:r>");
-            b.Append("</w:p></w:tc>");
+            foreach (var line in (text ?? "").Split('\n'))
+            {
+                b.Append("<w:p><w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/>");
+                if (center) b.Append("<w:jc w:val=\"center\"/>");
+                b.Append(RunProps(bold)).Append("</w:pPr>");
+                if (line.Length > 0)
+                    b.Append("<w:r>").Append(RunProps(bold)).Append("<w:t xml:space=\"preserve\">").Append(Esc(line)).Append("</w:t></w:r>");
+                b.Append("</w:p>");
+            }
+            b.Append("</w:tc>");
         }
 
         static void TableStart(StringBuilder b, int[] widths)

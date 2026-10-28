@@ -161,7 +161,8 @@ namespace TATimesheet
                             new XAttribute("start", e.Start),
                             new XAttribute("end", e.End),
                             new XAttribute("hours", e.Hours.HasValue ? e.Hours.Value.ToString("R", CultureInfo.InvariantCulture) : ""),
-                            new XAttribute("notes", e.Notes))))));
+                            new XAttribute("notes", e.Notes),
+                            e.Travel ? new XAttribute("travel", true) : null)))));
             doc.Save(path);
         }
 
@@ -178,7 +179,7 @@ namespace TATimesheet
                 int n;
                 bool b;
                 d.Settings.DefaultName = Attr(s, "defaultName");
-                if (int.TryParse(Attr(s, "periodWeeks"), out n) && n >= 1 && n <= 4) d.Settings.PeriodWeeks = n;
+                if (int.TryParse(Attr(s, "periodWeeks"), out n) && n >= 1 && n <= 2) d.Settings.PeriodWeeks = n;
                 d.Settings.PeriodAnchor = ParseD(Attr(s, "periodAnchor"), d.Settings.PeriodAnchor);
                 if (int.TryParse(Attr(s, "timeStep"), out n) && n >= 1 && n <= 60) d.Settings.TimeStepMinutes = n;
                 d.Settings.ExportFolder = Attr(s, "exportFolder");
@@ -222,6 +223,7 @@ namespace TATimesheet
                     double h;
                     if (double.TryParse(Attr(x, "hours"), NumberStyles.Float, CultureInfo.InvariantCulture, out h)) e.Hours = h;
                     e.Notes = Attr(x, "notes");
+                    e.Travel = Attr(x, "travel") == "true";
                     d.Entries.Add(e);
                 }
             return d;

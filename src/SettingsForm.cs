@@ -35,9 +35,9 @@ namespace TATimesheet
             Row(t, "Look", cboTheme, null, "Match Windows follows your Windows light/dark setting.");
 
             cboWeeks = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
-            cboWeeks.Items.AddRange(new object[] { "1 week", "2 weeks", "3 weeks", "4 weeks" });
-            cboWeeks.SelectedIndex = Math.Max(0, Math.Min(3, settings.PeriodWeeks - 1));
-            Row(t, "Pay period length", cboWeeks, null, null);
+            cboWeeks.Items.AddRange(new object[] { "Weekly", "Bi-weekly" });
+            cboWeeks.SelectedIndex = Math.Max(0, Math.Min(1, settings.PeriodWeeks - 1));
+            Row(t, "Timesheets are", cboWeeks, null, "Also on the main screen next to \"This period\".");
 
             dtAnchor = new ThemedDatePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dddd M/d/yyyy", Value = settings.PeriodAnchor, Width = 200 };
             Row(t, "A pay period starts on", dtAnchor, null, "Any date that begins a pay period, e.g. Monday 10/26/2026. Periods repeat from there.");

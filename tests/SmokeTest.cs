@@ -128,10 +128,57 @@ namespace TATimesheet.Tests
                 {
                     g.Clear(System.Drawing.Color.White);
                     g.ScaleTransform(2, 2); // 2 px per point
-                    TimesheetPrintDocument.Draw(g, pages[0], logo);
+                    LayoutPrintDocument.Draw(g, pages[0].Ops, logo, PdfExporter.PrintColor, "Arial", false);
                 }
                 bmp.Save(Path.Combine(outDir, "print-page1.png"), System.Drawing.Imaging.ImageFormat.Png);
             }
+
+            Console.WriteLine("Travel");
+            var trip = data.Entries.OrderBy(e => e.Date).First();
+            trip.Travel = true;
+            DataStore.Write(data, dataFile);
+            Check(DataStore.Read(dataFile).Entries.Count(e => e.Travel) == 1, "travel flag saved and loaded");
+            var travelSheet = TimesheetSheet.Build(data, p, header.Name, header.Customer);
+            Check(travelSheet.Weeks[0].Rows[0].Location == "Newark, CA\n(Travel)", "timesheet marks the travel row");
+            string travelDocx = Path.Combine(outDir, "travel.docx");
+            DocxExporter.Export(travelSheet, travelDocx, null);
+            var travelBack = Importer.ReadDocx(travelDocx).Entries.OrderBy(e => e.Date).ToList();
+            Check(travelBack[0].Travel && travelBack[0].Location == "Newark, CA" && !travelBack[1].Travel, "Word timesheet round-trips travel");
+            PdfExporter.Export(travelSheet, AppResources.DefaultLogoPng(), Path.Combine(outDir, "travel.pdf"));
+            DataExporters.ExportCsv(data, p.Start, p.End, csvOut);
+            Check(Importer.ReadCsv(csvOut).Entries.Count(e => e.Travel) == 1, "CSV round-trips travel");
+
+            Console.WriteLine("Weekly / bi-weekly");
+            var weekly = new AppSettings { PeriodWeeks = 1 };
+            var wp = Period.Containing(new DateTime(2026, 11, 4), weekly);
+            Check(wp.Start == new DateTime(2026, 11, 2) && wp.End == new DateTime(2026, 11, 8), "weekly period 11/2-11/8");
+            var weeklySheet = TimesheetSheet.Build(data, wp, header.Name, header.Customer);
+            Check(weeklySheet.Weeks.Count == 1 && weeklySheet.TotalHours == 67.75, "weekly timesheet total 67.75");
+
+            Console.WriteLine("Reports");
+            var byPeriod = Report.Build(data, new DateTime(2026, 10, 1), new DateTime(2026, 11, 30), ReportGrouping.PayPeriod);
+            Check(byPeriod.TotalHours == 105.5 && byPeriod.Rows.Sum(x => x.Hours) == 105.5, "report total 105.5");
+            Check(byPeriod.Rows.Count == 5 && byPeriod.Rows.Count(x => x.Hours > 0) == 1, "pay-period buckets include empty periods");
+            Check(byPeriod.TravelHours == 11.25 && byPeriod.DaysWorked == 9, "travel 11.25 h, 9 days worked");
+            var byWeek = Report.Build(data, p.Start, p.End, ReportGrouping.Week);
+            Check(byWeek.Rows.Count == 2 && byWeek.Rows[0].Hours == 37.75 && byWeek.Rows[1].Hours == 67.75, "by week 37.75 / 67.75");
+            Check(byWeek.Busiest.Label == "Week of 11/2/26", "busiest week");
+            var byProjectReport = Report.Build(data, p.Start, p.End, ReportGrouping.Project);
+            Check(byProjectReport.Rows.Count == 1 && byProjectReport.Rows[0].Label == "Motherson 260104-2", "by project");
+            var byMonth = Report.Build(data, new DateTime(2026, 1, 1), new DateTime(2026, 12, 31), ReportGrouping.Month);
+            Check(byMonth.Rows.Count == 12 && byMonth.Rows[9].Hours == 37.75 && byMonth.Rows[10].Hours == 67.75, "by month Oct 37.75 / Nov 67.75");
+            PdfExporter.ExportPages((w, h) => ReportLayout.Build(byMonth, w, h), AppResources.DefaultLogoPng(),
+                Path.Combine(outDir, "report-month.pdf"), "Hours report", "Benjamin Turner");
+            PdfExporter.ExportPages((w, h) => ReportLayout.Build(byProjectReport, w, h), AppResources.DefaultLogoPng(),
+                Path.Combine(outDir, "report-project.pdf"), "Hours report", "Benjamin Turner");
+            var longWeeks = Report.Build(data, new DateTime(2025, 1, 1), new DateTime(2026, 12, 31), ReportGrouping.Week);
+            PdfExporter.ExportPages((w, h) => ReportLayout.Build(longWeeks, w, h), AppResources.DefaultLogoPng(),
+                Path.Combine(outDir, "report-weeks-2y.pdf"), "Hours report", "Benjamin Turner");
+            Check(ReportLayout.Build(longWeeks, 0, 0).Count > 1, "long report paginates");
+            DataExporters.ExportReportXlsx(data, byMonth, Path.Combine(outDir, "report.xlsx"));
+            DataExporters.ExportReportCsv(byMonth, Path.Combine(outDir, "report.csv"));
+            Check(File.ReadAllLines(Path.Combine(outDir, "report.csv")).Length == 14, "report csv: header + 12 months + total");
+            DataExporters.ExportXlsx(data, p.Start, p.End, Path.Combine(outDir, "entries-travel.xlsx"));
 
             Console.WriteLine(failures == 0 ? "ALL PASSED" : failures + " FAILED");
             return failures == 0 ? 0 : 1;

@@ -20,7 +20,7 @@ namespace TATimesheet
 
         public bool Dark;
         public Color Window, Surface, Input, Text, Heading, Muted, Border;
-        public Color Accent, AccentTint, Selection, SelectionText;
+        public Color Accent, AccentTint, Selection, SelectionText, Chart;
         public Color WarnTint, WarnText, GridBack, WeekendTint, GridLine, Placeholder;
         public Color HeaderBack, HeaderText, Banner, BannerText, Link;
         public Color ButtonBack, ButtonHover, ButtonPressed;
@@ -36,6 +36,7 @@ namespace TATimesheet
             Muted = Color.FromArgb(120, 128, 134),
             Border = Color.FromArgb(204, 204, 204),
             Accent = Color.FromArgb(18, 160, 58),
+            Chart = Color.FromArgb(18, 160, 58),        // validated: lightness band + 3:1 vs light surface
             AccentTint = Color.FromArgb(226, 244, 229),
             Selection = Color.FromArgb(198, 234, 205),
             SelectionText = Color.Black,
@@ -66,6 +67,7 @@ namespace TATimesheet
             Muted = Color.FromArgb(150, 156, 161),
             Border = Color.FromArgb(85, 85, 85),
             Accent = Color.FromArgb(76, 205, 108),
+            Chart = Color.FromArgb(54, 172, 86),        // validated for the dark surface (the brighter accent is too light for a fill)
             AccentTint = Color.FromArgb(31, 58, 39),
             Selection = Color.FromArgb(44, 92, 58),
             SelectionText = Color.White,

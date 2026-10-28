@@ -15,7 +15,7 @@ namespace TATimesheet
         static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         public static readonly string[] Columns =
-            { "Date", "Day", "Project", "Location", "Start", "End", "Hours", "Notes", "Customer", "Name" };
+            { "Date", "Day", "Project", "Location", "Start", "End", "Hours", "Travel", "Notes", "Customer", "Name" };
 
         // ---- CSV -------------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ namespace TATimesheet
                 b.AppendLine(string.Join(",", new[]
                 {
                     e.Date.ToString("M/d/yyyy", Inv), e.Date.ToString("ddd", Inv), Csv(e.Project), Csv(e.Location),
-                    e.Start, e.End, TimeUtil.FormatHours(e.Hours), Csv(e.Notes),
+                    e.Start, e.End, TimeUtil.FormatHours(e.Hours), e.Travel ? "Yes" : "", Csv(e.Notes),
                     Csv(data.CustomerOn(e.Date)), Csv(data.NameOn(e.Date))
                 }));
             }
@@ -108,7 +108,7 @@ namespace TATimesheet
             var entries = data.EntriesBetween(from, to).ToList();
 
             // Sheet 1: every entry.
-            var sh = new Sheet { Name = "Entries", Widths = new double[] { 11, 6, 26, 18, 8, 8, 8, 40, 22, 20 } };
+            var sh = new Sheet { Name = "Entries", Widths = new double[] { 11, 6, 26, 18, 8, 8, 8, 8, 40, 22, 20 } };
             sh.StartRow(); sh.Text(0, "Timesheet entries", STitle); sh.EndRow();
             sh.StartRow();
             sh.Text(0, string.Format("{0} to {1}", from.ToString("M/d/yyyy", Inv), to.ToString("M/d/yyyy", Inv)), 0);
@@ -130,9 +130,10 @@ namespace TATimesheet
                 if (TimeUtil.TryParseTime(e.Start, out m)) sh.Number(4, m / 1440.0, STime); else sh.Text(4, e.Start, SText);
                 if (TimeUtil.TryParseTime(e.End, out m)) sh.Number(5, m / 1440.0, STime); else sh.Text(5, e.End, SText);
                 if (e.Hours.HasValue) sh.Number(6, e.Hours.Value, SNum); else sh.Blank(6, SNum);
-                sh.Text(7, e.Notes, SText);
-                sh.Text(8, data.CustomerOn(e.Date), SText);
-                sh.Text(9, data.NameOn(e.Date), SText);
+                if (e.Travel) sh.Text(7, "Yes", SNum); else sh.Blank(7, SNum);
+                sh.Text(8, e.Notes, SText);
+                sh.Text(9, data.CustomerOn(e.Date), SText);
+                sh.Text(10, data.NameOn(e.Date), SText);
                 sh.EndRow();
             }
             int lastData = sh.RowCount;
@@ -143,52 +144,140 @@ namespace TATimesheet
             else sh.Number(6, 0, STotalNum);
             sh.EndRow();
 
-            // Sheet 2: totals by pay period, week and project (handy for invoicing).
-            var sum = new Sheet { Name = "Summary", Widths = new double[] { 26, 18, 10, 10, 4, 14, 10 } };
+            // Sheet 2: totals by project and by week (handy for invoicing).
+            var byProject = Report.Build(data, from, to, ReportGrouping.Project);
+            var byWeek = Report.Build(data, from, to, ReportGrouping.Week);
+            var sum = new Sheet { Name = "Summary", Widths = new double[] { 26, 8, 10, 10, 4, 18, 10, 10 } };
             sum.StartRow(); sum.Text(0, "Hours summary", STitle); sum.EndRow();
             sum.StartRow(); sum.EndRow();
-
             sum.StartRow();
-            sum.Text(0, "Project", SHeader); sum.Text(1, "Location", SHeader); sum.Text(2, "Days", SHeader); sum.Text(3, "Hours", SHeader);
-            sum.Text(5, "Week starting", SHeader); sum.Text(6, "Hours", SHeader);
+            sum.Text(0, "Project", SHeader); sum.Text(1, "Days", SHeader); sum.Text(2, "Hours", SHeader); sum.Text(3, "Travel h", SHeader);
+            sum.Text(5, "Week", SHeader); sum.Text(6, "Hours", SHeader); sum.Text(7, "Travel h", SHeader);
             sum.EndRow();
-
-            var byProject = entries.GroupBy(e => new { P = e.Project.Trim(), L = e.Location.Trim() })
-                                   .OrderByDescending(g => g.Sum(e => e.Hours ?? 0)).ToList();
-            var settings = data.Settings;
-            var byWeek = entries.GroupBy(e =>
-                                {
-                                    var p = Period.Containing(e.Date, settings);
-                                    return p.WeekStart((int)(e.Date - p.Start).TotalDays / 7);
-                                })
-                                .OrderBy(g => g.Key).ToList();
-            int rows = Math.Max(byProject.Count, byWeek.Count);
+            var weeks = byWeek.Rows.Where(r => r.Hours > 0).ToList();
+            int rows = Math.Max(byProject.Rows.Count, weeks.Count);
             for (int i = 0; i < rows; i++)
             {
                 sum.StartRow();
-                if (i < byProject.Count)
+                if (i < byProject.Rows.Count)
                 {
-                    var g = byProject[i];
-                    sum.Text(0, g.Key.P.Length > 0 ? g.Key.P : "(no project)", SText);
-                    sum.Text(1, g.Key.L, SText);
-                    sum.Number(2, g.Select(e => e.Date).Distinct().Count(), SNum);
-                    sum.Number(3, Math.Round(g.Sum(e => e.Hours ?? 0), 2), SNum);
+                    var r = byProject.Rows[i];
+                    sum.Text(0, r.Label, SText);
+                    sum.Number(1, r.Days, SNum);
+                    sum.Number(2, r.Hours, SNum);
+                    sum.Number(3, r.TravelHours, SNum);
                 }
-                if (i < byWeek.Count)
+                if (i < weeks.Count)
                 {
-                    sum.Number(5, ExcelDate(byWeek[i].Key), SDate);
-                    sum.Number(6, Math.Round(byWeek[i].Sum(e => e.Hours ?? 0), 2), SNum);
+                    sum.Text(5, weeks[i].Label, SText);
+                    sum.Number(6, weeks[i].Hours, SNum);
+                    sum.Number(7, weeks[i].TravelHours, SNum);
                 }
                 sum.EndRow();
             }
             sum.StartRow();
-            sum.Text(2, "Total", STotalLabel);
-            sum.Number(3, total, STotalNum);
+            sum.Text(1, "Total", STotalLabel);
+            sum.Number(2, total, STotalNum);
+            sum.Number(3, byProject.TravelHours, STotalNum);
             sum.Text(5, "Total", STotalLabel);
             sum.Number(6, total, STotalNum);
+            sum.Number(7, byWeek.TravelHours, STotalNum);
             sum.EndRow();
 
             WriteWorkbook(path, new[] { sh, sum });
+        }
+
+        // ---- Reports ---------------------------------------------------------------------------
+
+        public static readonly string[] ReportColumns = { "Hours", "Travel h", "Days worked", "Avg h/day", "% of total" };
+
+        static double Share(Report r, ReportRow row)
+        {
+            return r.TotalHours > 0 ? Math.Round(100 * row.Hours / r.TotalHours, 1) : 0;
+        }
+
+        public static void ExportReportCsv(Report r, string path)
+        {
+            var b = new StringBuilder();
+            b.AppendLine(Csv(r.GroupingName) + "," + string.Join(",", ReportColumns));
+            foreach (var row in r.TableRows)
+                b.AppendLine(string.Join(",", new[]
+                {
+                    Csv(row.Label), TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.TravelHours),
+                    row.Days.ToString(Inv), TimeUtil.FormatHours(row.AvgPerDay), Share(r, row).ToString("0.#", Inv)
+                }));
+            b.AppendLine(string.Join(",", new[]
+            {
+                "Total", TimeUtil.FormatHours(r.TotalHours), TimeUtil.FormatHours(r.TravelHours),
+                r.DaysWorked.ToString(Inv), TimeUtil.FormatHours(r.AvgPerDay), r.TotalHours > 0 ? "100" : "0"
+            }));
+            string tmp = path + ".writing";
+            File.WriteAllText(tmp, b.ToString(), new UTF8Encoding(true));
+            DocxExporter.ReplaceFile(tmp, path);
+        }
+
+        /// <summary>The report table, plus every entry it was built from on a second sheet.</summary>
+        public static void ExportReportXlsx(AppData data, Report r, string path)
+        {
+            var sh = new Sheet { Name = "Report", Widths = new double[] { 26, 10, 10, 12, 11, 11 } };
+            sh.StartRow(); sh.Text(0, "Hours report by " + r.GroupingName.ToLowerInvariant(), STitle); sh.EndRow();
+            sh.StartRow(); sh.Text(0, r.RangeText + (r.Name.Length > 0 ? "   " + r.Name : ""), 0); sh.EndRow();
+            sh.StartRow(); sh.EndRow();
+            sh.StartRow();
+            sh.Text(0, r.GroupingName, SHeader);
+            for (int i = 0; i < ReportColumns.Length; i++) sh.Text(i + 1, ReportColumns[i], SHeader);
+            sh.EndRow();
+            sh.FreezeRows = sh.RowCount;
+            int first = sh.RowCount + 1;
+            foreach (var row in r.TableRows)
+            {
+                sh.StartRow();
+                sh.Text(0, row.Label, SText);
+                sh.Number(1, row.Hours, SNum);
+                sh.Number(2, row.TravelHours, SNum);
+                sh.Number(3, row.Days, SNum);
+                sh.Number(4, row.AvgPerDay, SNum);
+                sh.Number(5, Share(r, row), SNum);
+                sh.EndRow();
+            }
+            int last = sh.RowCount;
+            sh.StartRow();
+            sh.Text(0, "Total", STotalLabel);
+            if (last >= first)
+            {
+                sh.Formula(1, string.Format("SUM(B{0}:B{1})", first, last), r.TotalHours, STotalNum);
+                sh.Formula(2, string.Format("SUM(C{0}:C{1})", first, last), r.TravelHours, STotalNum);
+            }
+            else
+            {
+                sh.Number(1, 0, STotalNum);
+                sh.Number(2, 0, STotalNum);
+            }
+            sh.Number(3, r.DaysWorked, STotalNum);
+            sh.Number(4, r.AvgPerDay, STotalNum);
+            sh.Number(5, r.TotalHours > 0 ? 100 : 0, STotalNum);
+            sh.EndRow();
+
+            var entries = new Sheet { Name = "Entries", Widths = new double[] { 11, 6, 26, 18, 8, 8, 8, 8, 40 } };
+            entries.StartRow();
+            for (int i = 0; i < 9; i++) entries.Text(i, Columns[i], SHeader);
+            entries.EndRow();
+            entries.FreezeRows = 1;
+            foreach (var e in data.EntriesBetween(r.From, r.To))
+            {
+                entries.StartRow();
+                entries.Number(0, ExcelDate(e.Date), SDate);
+                entries.Text(1, e.Date.ToString("ddd", Inv), SText);
+                entries.Text(2, e.Project, SText);
+                entries.Text(3, e.Location, SText);
+                entries.Text(4, e.Start, SNum);
+                entries.Text(5, e.End, SNum);
+                if (e.Hours.HasValue) entries.Number(6, e.Hours.Value, SNum); else entries.Blank(6, SNum);
+                if (e.Travel) entries.Text(7, "Yes", SNum); else entries.Blank(7, SNum);
+                entries.Text(8, e.Notes, SText);
+                entries.EndRow();
+            }
+            WriteWorkbook(path, new[] { sh, entries });
         }
 
         static string SheetXml(Sheet s)

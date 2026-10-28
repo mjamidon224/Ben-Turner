@@ -4,6 +4,13 @@ A Windows 11 desktop app for logging hours and producing the Turner Automation *
 
 - **Dropdown history** for Project, Location, Customer and Name. Start typing and it autocompletes. Picking a project fills in the location you last used with it.
 - **Start/End time dropdowns** list your most-used times at the top. You can also type them: `6`, `0630`, `6:30`, `6:30p` all work.
+- **Travel checkbox** on every entry. Travel rows show "(Travel)" under the location on the customer timesheet, get their own column in the list and in Excel/CSV, and travel hours are broken out in totals and reports.
+- **Weekly or bi-weekly timesheets.** Switch with the box next to **This period** (or **Period > Weekly / Bi-weekly timesheets**).
+- **Reports (Ctrl+R)** for your whole history: hours for any date range grouped by pay period, week, month, year, project, location or customer.
+  - Each report has a chart, totals, days worked, average hours per day and per week, travel hours and your busiest stretch.
+  - Export a report as PDF, Excel or CSV, or print it.
+  - Double-click a row to jump to that week in the main window.
+  - **Save every timesheet in this range** rebuilds all your old Word or PDF timesheets in one go.
 - **Hours calculate themselves**, including shifts that run past midnight. Week and period totals are added up automatically.
 - **Mismatch warnings.** If the hours on a row don't match its start and end times, the Hours cell turns orange.
 - **Exports:**
@@ -51,6 +58,7 @@ Name and Customer at the top right are saved per pay period. They're what gets p
 | Ctrl+PgUp / Ctrl+PgDn / Ctrl+T | Previous / next / current pay period |
 | Ctrl+E / Ctrl+Shift+E | Export Word / PDF |
 | Ctrl+P | Print preview |
+| Ctrl+R | Reports |
 | Ctrl+H | Manage dropdown history |
 | F1 | Help |
 
@@ -85,6 +93,7 @@ The code is plain C# 5 / WinForms on .NET Framework 4.x with no NuGet packages. 
 | `src/DataStore.cs` | Saving, loading and daily backups |
 | `src/DocxExporter.cs` | Word timesheet |
 | `src/SheetLayout.cs`, `src/PdfExporter.cs`, `src/PrintSupport.cs` | PDF and printing (shared page layout) |
-| `src/DataExporters.cs` | Excel and CSV |
+| `src/DataExporters.cs` | Excel and CSV (entries and reports) |
+| `src/Reports.cs`, `src/ReportLayout.cs`, `src/BarChart.cs`, `src/ReportsForm.cs` | Historical reports: numbers, PDF/print layout, chart, window |
 | `src/Importers.cs` | Word and CSV import |
 | `tests/SmokeTest.cs` | Headless checks run by `build.sh test` |

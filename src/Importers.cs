@@ -92,6 +92,7 @@ namespace TATimesheet
                 else if (c == "hours" || c == "hrs" || c == "total hours") key = "hours";
                 else if (c.StartsWith("note") || c == "description") key = "notes";
                 else if (c == "customer") key = "customer";
+                else if (c.StartsWith("travel")) key = "travel";
                 else if (c == "name") key = "name";
                 if (key != null && !map.ContainsKey(key)) map[key] = i;
             }
@@ -118,6 +119,15 @@ namespace TATimesheet
                 End = TimeUtil.NormalizeTime(Get(cells, cols, "end")),
                 Notes = Get(cells, cols, "notes")
             };
+            string travel = Get(cells, cols, "travel").ToLowerInvariant();
+            e.Travel = travel == "yes" || travel == "y" || travel == "true" || travel == "1" || travel == "x" || travel == "\u2713";
+            // Word timesheets from this app put "(Travel)" under the location.
+            string mark = TimesheetSheet.TravelMark.ToLowerInvariant();
+            if (e.Location.ToLowerInvariant().EndsWith(mark))
+            {
+                e.Location = e.Location.Substring(0, e.Location.Length - mark.Length).Trim();
+                e.Travel = true;
+            }
             double h;
             if (TimeUtil.TryParseHours(Get(cells, cols, "hours"), out h)) e.Hours = h;
             else e.Hours = e.ComputedHours;

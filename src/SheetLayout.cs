@@ -7,17 +7,34 @@ namespace TATimesheet
 {
     public abstract class DrawOp { }
 
+    /// <summary>What a mark is, so each renderer (PDF/print vs. the themed screen) can pick its color.</summary>
+    public enum Ink { Black, Muted, Grid, Bar }
+
+    public enum TextAnchor { Left, Center, Right }
+
     /// <summary>Text drawn with its baseline at Y (points from the top-left of the page).</summary>
     public class TextOp : DrawOp
     {
-        public float X, Y, Size;
+        public float X, Y, Size;     // X is the left edge, centre or right edge depending on Align
         public bool Bold;
         public string Text;
+        public Ink Ink;
+        public TextAnchor Align;
     }
 
     public class LineOp : DrawOp
     {
         public float X1, Y1, X2, Y2, Width;
+        public Ink Ink;
+    }
+
+    /// <summary>A filled rectangle (chart bars). Index ties a bar back to its report row.</summary>
+    public class FillOp : DrawOp
+    {
+        public float X, Y, W, H;
+        public Ink Ink = Ink.Bar;
+        public int Index = -1;
+        public bool RoundTop, RoundRight; // screen only: 4px rounded data-end
     }
 
     public class ImageOp : DrawOp
@@ -167,6 +184,11 @@ namespace TATimesheet
             var lines = new List<string>();
             text = (text ?? "").Trim();
             if (text.Length == 0) return lines;
+            if (text.IndexOf('\n') >= 0)
+            {
+                foreach (var part in text.Split('\n')) lines.AddRange(Wrap(part, bold, size, width));
+                return lines;
+            }
             string current = "";
             foreach (var word in text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
             {
