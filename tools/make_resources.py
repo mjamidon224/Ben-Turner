@@ -56,5 +56,15 @@ mark.putdata(data)
 side = max(mark.size) + 8
 square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
 square.paste(mark, ((side - mark.size[0]) // 2, (side - mark.size[1]) // 2), mark)
-square.save(out_dir / "app.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+ICO_SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+square.save(out_dir / "app.ico", sizes=ICO_SIZES)
+
+# TEST copy icon: same mark with an orange badge so the two are easy to tell apart.
+from PIL import ImageDraw
+test = square.resize((256, 256), Image.LANCZOS)
+d = ImageDraw.Draw(test)
+d.ellipse((128, 128, 252, 252), fill=(255, 176, 0, 255), outline=(0, 0, 0, 255), width=10)
+d.rectangle((166, 160, 214, 176), fill=(0, 0, 0, 255))   # a chunky "T"
+d.rectangle((182, 160, 198, 222), fill=(0, 0, 0, 255))
+test.save(out_dir / "app-test.ico", sizes=ICO_SIZES)
 print("wrote", out_dir)

@@ -49,7 +49,7 @@ namespace TATimesheet
             boldFont = new Font(Font, FontStyle.Bold);
             italicFont = new Font(Font, FontStyle.Italic);
             totalFont = new Font("Segoe UI Semibold", 9F);
-            Text = "TA Timesheet";
+            Text = BuildInfo.IsTest ? "TA Timesheet \u2013 TEST COPY (practice data)" : "TA Timesheet";
             Icon = AppResources.AppIcon();
             MinimumSize = new Size(900, 560);
             Size = new Size(1200, 800);
@@ -81,6 +81,20 @@ namespace TATimesheet
 
             Controls.Add(root);
             Controls.Add(BuildStatusBar());
+            if (BuildInfo.IsTest)
+            {
+                Controls.Add(new Label
+                {
+                    Text = "TEST COPY \u2013 practice data, kept separate from the real app. Break whatever you want. File > Reset test data starts over.",
+                    Dock = DockStyle.Top,
+                    AutoSize = false,
+                    Height = (int)(Font.Height * 1.9),
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    BackColor = Color.FromArgb(255, 196, 0),
+                    ForeColor = Color.Black,
+                    Font = boldFont
+                });
+            }
             var menu = BuildMenu();
             Controls.Add(menu);
             MainMenuStrip = menu;
@@ -448,6 +462,7 @@ namespace TATimesheet
             file.DropDownItems.Add(Item("&Back up data to...", Keys.None, BackupData));
             file.DropDownItems.Add(Item("&Restore from backup...", Keys.None, RestoreData));
             file.DropDownItems.Add(Item("&Open data folder", Keys.None, OpenDataFolder));
+            if (BuildInfo.IsTest) file.DropDownItems.Add(Item("Reset &test data", Keys.None, ResetTestData));
             file.DropDownItems.Add(new ToolStripSeparator());
             file.DropDownItems.Add(Item("E&xit", Keys.Alt | Keys.F4, Close));
 
@@ -1038,10 +1053,19 @@ namespace TATimesheet
             cboStart.SelectAll();
             if (!store.IsFirstRun) return;
             Persist("Welcome! Your data is saved automatically.");
+            if (BuildInfo.IsTest)
+            {
+                Ui.Info(this,
+                    "This is the TEST copy of TA Timesheet.\n\n" +
+                    "It keeps its own practice data, completely separate from the real app, and starts with the " +
+                    "entries from your 10/26/26 timesheet. Add, edit, delete, export, import \u2013 nothing here touches your real timesheets.\n\n" +
+                    "File > Reset test data puts it back the way it started.");
+                return;
+            }
             if (Ui.Confirm(this,
                     "Welcome to TA Timesheet.\n\nGot old timesheets in Word (TA_Timesheet_*.docx)? " +
                     "Import them now so your entries and dropdowns are filled in.\n\nImport some now?",
-                    "TA Timesheet"))
+                    BuildInfo.AppName))
                 ImportDocx();
         }
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds TATimesheet.exe with Mono (Linux/macOS). On Windows use build.bat instead.
-#   ./build.sh            -> dist/TATimesheet.exe
+#   ./build.sh            -> dist/TATimesheet.exe and dist/TATimesheet-Test.exe (practice copy)
 #   ./build.sh test DOCX  -> also builds and runs the smoke test against a real timesheet .docx
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -13,6 +13,8 @@ FLAGS="-langversion:5 -sdk:4.5 -optimize+ -nologo -warnaserror+"
 mkdir -p dist
 mcs $FLAGS -target:winexe -win32icon:src/Resources/app.ico $REFS $RES -out:dist/TATimesheet.exe src/*.cs
 echo "built dist/TATimesheet.exe"
+mcs $FLAGS -define:TEST_BUILD -target:winexe -win32icon:src/Resources/app-test.ico $REFS $RES -out:dist/TATimesheet-Test.exe src/*.cs
+echo "built dist/TATimesheet-Test.exe"
 
 if [ "${1:-}" = "test" ]; then
   out="${3:-build/test-output}"

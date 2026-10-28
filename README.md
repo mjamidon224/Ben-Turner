@@ -25,6 +25,15 @@ A Windows 11 desktop app for logging hours and producing the Turner Automation *
 
 Nothing else needs to be installed. The app uses the .NET Framework 4.8 that comes with Windows 10 and 11.
 
+### Test copy
+
+[`dist/TATimesheet-Test.exe`](dist/TATimesheet-Test.exe) is a practice copy for trying things out. It has an orange **TEST COPY** banner and an orange badge on its icon.
+
+- It keeps its own data in `%APPDATA%\TA Timesheet TEST`, completely separate from the real app.
+- It starts with the entries from the 10/26/26 timesheet already loaded.
+- **File > Reset test data** puts it back to that starting point.
+- It can run at the same time as the real app.
+
 ## Using it
 
 1. **First run:** the app offers to import your old Word timesheets. Say yes and select all the `TA_Timesheet_*.docx` files. This fills in your history and dropdowns.
@@ -58,7 +67,7 @@ Everything lives in one file: `%APPDATA%\TA Timesheet\timesheet-data.xml`. Click
 
 The exe in `dist/` is prebuilt. To rebuild it:
 
-- **Windows:** double-click `build.bat`. It uses the C# compiler that ships with Windows, so Visual Studio isn't needed.
+- **Windows:** double-click `build.bat`. It builds both exes with the C# compiler that ships with Windows, so Visual Studio isn't needed.
 - **Linux/macOS (Mono):** run `./build.sh`. To also run the headless tests against a real timesheet:
   `./build.sh test path/to/TA_Timesheet_102626.docx`
 
@@ -68,6 +77,7 @@ The code is plain C# 5 / WinForms on .NET Framework 4.x with no NuGet packages. 
 |---|---|
 | `src/MainForm*.cs` | Main window and its actions |
 | `src/Models.cs`, `src/TimeUtil.cs` | Entries, pay periods, time parsing |
+| `src/BuildInfo.cs` | Real vs. test copy differences and the test copy's sample entries |
 | `src/DataStore.cs` | Saving, loading and daily backups |
 | `src/DocxExporter.cs` | Word timesheet |
 | `src/SheetLayout.cs`, `src/PdfExporter.cs`, `src/PrintSupport.cs` | PDF and printing (shared page layout) |

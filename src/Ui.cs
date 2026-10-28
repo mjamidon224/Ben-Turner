@@ -100,12 +100,12 @@ namespace TATimesheet
 
         public static void Error(IWin32Window owner, string message)
         {
-            MessageBox.Show(owner, message, "TA Timesheet", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(owner, message, BuildInfo.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         public static void Info(IWin32Window owner, string message)
         {
-            MessageBox.Show(owner, message, "TA Timesheet", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(owner, message, BuildInfo.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         public static bool Confirm(IWin32Window owner, string message, string title)

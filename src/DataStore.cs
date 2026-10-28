@@ -31,7 +31,7 @@ namespace TATimesheet
 
         public static string DefaultFolder()
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TA Timesheet");
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), BuildInfo.DataFolderName);
         }
 
         public AppData Load()

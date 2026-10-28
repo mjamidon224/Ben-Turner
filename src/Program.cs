@@ -21,11 +21,11 @@ namespace TATimesheet
             Application.SetCompatibleTextRenderingDefault(false);
 
             bool firstInstance;
-            using (var mutex = new Mutex(true, "TATimesheet.SingleInstance", out firstInstance))
+            using (var mutex = new Mutex(true, BuildInfo.MutexName, out firstInstance))
             {
                 if (!firstInstance)
                 {
-                    MessageBox.Show("TA Timesheet is already open. Check your taskbar.", "TA Timesheet",
+                    MessageBox.Show(BuildInfo.AppName + " is already open. Check your taskbar.", BuildInfo.AppName,
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
@@ -48,7 +48,7 @@ namespace TATimesheet
                         (moved != null ? "It was set aside as:\n" + moved + "\n\n" : "") +
                         "Starting fresh. Use File > Restore from backup to get your entries back " +
                         "(daily backups are in " + store.BackupFolder + ").",
-                        "TA Timesheet", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        BuildInfo.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     data = AppData.CreateDefault();
                 }
 
@@ -61,7 +61,7 @@ namespace TATimesheet
         {
             if (ex == null) return;
             MessageBox.Show("Something went wrong:\n\n" + ex.Message + "\n\nYour saved entries are safe.",
-                "TA Timesheet", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                BuildInfo.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

@@ -98,6 +98,7 @@ namespace TATimesheet
             d.Customers.Add("Mission Automation");
             d.Projects.Add("Motherson 260104-2");
             d.Locations.Add("Newark, CA");
+            if (BuildInfo.IsTest) BuildInfo.AddSampleEntries(d);
             return d;
         }
 

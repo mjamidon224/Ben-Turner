@@ -1,7 +1,11 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+#if TEST_BUILD
+[assembly: AssemblyTitle("TA Timesheet TEST")]
+#else
 [assembly: AssemblyTitle("TA Timesheet")]
+#endif
 [assembly: AssemblyDescription("Timesheet tracker for Turner Automation")]
 [assembly: AssemblyCompany("Turner Automation")]
 [assembly: AssemblyProduct("TA Timesheet")]

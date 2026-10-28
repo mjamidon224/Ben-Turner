@@ -308,6 +308,16 @@ namespace TATimesheet
             LoadPeriod(true);
         }
 
+        void ResetTestData()
+        {
+            if (!BuildInfo.IsTest) return;
+            if (!Ui.Confirm(this, "Throw away everything in this TEST copy and start over with the sample entries?", "Reset test data")) return;
+            data = AppData.CreateDefault();
+            Persist("Test data reset");
+            period = Period.Containing(DateTime.Today, data.Settings);
+            LoadPeriod(true);
+        }
+
         void OpenDataFolder()
         {
             try
@@ -385,7 +395,7 @@ namespace TATimesheet
         void ShowAbout()
         {
             var v = Assembly.GetExecutingAssembly().GetName().Version;
-            Ui.Info(this, "TA Timesheet " + v.Major + "." + v.Minor + "\nTurner Automation\n\n" +
+            Ui.Info(this, BuildInfo.AppName + " " + v.Major + "." + v.Minor + "\nTurner Automation\n\n" +
                           data.Entries.Count + " entries on file.\nData: " + store.FilePath);
         }
     }

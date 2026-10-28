@@ -20,12 +20,25 @@ if not exist dist mkdir dist
   /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ^
   /r:System.Xml.dll /r:System.Xml.Linq.dll /r:System.IO.Compression.dll ^
   src\*.cs
-if errorlevel 1 (
-  echo.
-  echo BUILD FAILED
-  pause
-  exit /b 1
-)
+if errorlevel 1 goto failed
+
+rem Practice copy: separate data, sample entries, orange TEST banner.
+"%CSC%" /nologo /target:winexe /optimize+ /codepage:65001 /define:TEST_BUILD ^
+  /out:dist\TATimesheet-Test.exe ^
+  /win32icon:src\Resources\app-test.ico ^
+  /resource:src\Resources\TimesheetTemplate.docx,TATimesheet.TimesheetTemplate.docx ^
+  /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ^
+  /r:System.Xml.dll /r:System.Xml.Linq.dll /r:System.IO.Compression.dll ^
+  src\*.cs
+if errorlevel 1 goto failed
+
 echo.
-echo Built dist\TATimesheet.exe
+echo Built dist\TATimesheet.exe and dist\TATimesheet-Test.exe
 pause
+exit /b 0
+
+:failed
+echo.
+echo BUILD FAILED
+pause
+exit /b 1
