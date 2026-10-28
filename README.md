@@ -32,6 +32,18 @@ A Windows 11 desktop app for logging hours and producing the Turner Automation *
    - If Windows says **"Windows protected your PC"**, click **More info**, then **Run anyway**. This happens because the app isn't code-signed.
    - If it still won't open, right-click the exe, choose **Properties**, tick **Unblock**, then click **OK**.
 
+### If Windows Defender calls it a virus
+
+It's a false positive. Defender runs a machine-learning guess on new, unsigned programs that nobody else has run yet, and small custom apps like this one trip it. The detection name usually ends in `!ml`, for example `Trojan:Win32/Wacatac.B!ml`. All of the source code is in `src/` if you want to check it.
+
+Your options, best first:
+
+1. **Build it yourself on your PC.** Download the repository and double-click `build.bat`. It uses the C# compiler that ships with Windows, and a program made on your own machine isn't treated as an untrusted download.
+2. **Tell Microsoft it's a mistake.** Go to <https://www.microsoft.com/en-us/wdsi/filesubmission>, upload the exe, and choose "Incorrectly detected as malware". They usually clear it within a day or two, and then nobody gets the warning for that file.
+3. **Permanent fix: sign the exe with a code-signing certificate.** Azure Trusted Signing costs about $10 a month; a traditional certificate costs a few hundred dollars a year. Signed apps build up reputation and stop getting flagged.
+
+The build is set up to avoid what these heuristics look for. It uses Microsoft's own compiler, includes a standard Windows manifest that runs as a normal user with no admin rights, and stores the embedded Word template uncompressed.
+
 Nothing else needs to be installed. The app uses the .NET Framework 4.8 that comes with Windows 10 and 11.
 
 ### Test copy
@@ -80,7 +92,7 @@ Everything lives in one file: `%APPDATA%\TA Timesheet\timesheet-data.xml`. Click
 The exe in `dist/` is prebuilt. To rebuild it:
 
 - **Windows:** double-click `build.bat`. It builds both exes with the C# compiler that ships with Windows, so Visual Studio isn't needed.
-- **Linux/macOS (Mono):** run `./build.sh`. To also run the headless tests against a real timesheet:
+- **Linux/macOS:** run `./build.sh`. It uses Microsoft's Roslyn compiler from the .NET SDK, and needs Mono for the reference assemblies and to run the tests. To also run the headless tests against a real timesheet:
   `./build.sh test path/to/TA_Timesheet_102626.docx`
 
 The code is plain C# 5 / WinForms on .NET Framework 4.x with no NuGet packages. The Word export starts from `src/Resources/TimesheetTemplate.docx`, which keeps the original header, logo, styles and page setup. `tools/make_resources.py` regenerates that template and the app icon from any real timesheet .docx.

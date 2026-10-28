@@ -21,7 +21,19 @@ STUB_DOC = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>'
             '<w:cols w:space="720"/><w:docGrid w:linePitch="360"/></w:sectPr></w:body></w:document>')
 
-with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out_dir / "TimesheetTemplate.docx", "w", zipfile.ZIP_DEFLATED) as zout:
+def clean_logo(png_bytes):
+    """The original logo sits on a noisy off-white background, which bloats it to ~450 KB of
+    incompressible data. Flatten the background to white and keep 128 colours: looks the same
+    (no faint grey box behind it any more) at ~50 KB."""
+    rgb = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    rgb.putdata([(255, 255, 255) if min(p) >= 235 else p for p in list(rgb.getdata())])
+    out = io.BytesIO()
+    rgb.quantize(colors=128, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+# Stored, not deflated: the template is embedded in the exe, and a big compressed blob inside an
+# executable is exactly what antivirus heuristics look for in packed malware.
+with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out_dir / "TimesheetTemplate.docx", "w", zipfile.ZIP_STORED) as zout:
     for item in zin.infolist():
         name = item.filename
         if name.startswith("customXml/"):
@@ -33,6 +45,8 @@ with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out_dir / "TimesheetTemplate.d
             data = re.sub(rb'<Relationship [^>]*customXml[^>]*/>', b"", data)
         elif name == "[Content_Types].xml":
             data = re.sub(rb'<Override PartName="/customXml/[^>]*/>', b"", data)
+        elif name == "word/media/image1.png":
+            data = clean_logo(data)
         elif name == "word/settings.xml":
             data = re.sub(rb"<w:rsids>.*?</w:rsids>", b"", data, flags=re.S)
         zout.writestr(name, data)

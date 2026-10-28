@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -8,15 +7,10 @@ namespace TATimesheet
 {
     static class Program
     {
-        [DllImport("user32.dll")]
-        static extern bool SetProcessDPIAware();
-
         [STAThread]
         static void Main()
         {
-            // Crisp text on high-DPI laptop screens instead of Windows stretching a blurry bitmap.
-            try { SetProcessDPIAware(); } catch (Exception) { }
-
+            // DPI awareness (crisp text on high-DPI screens) is declared in app.manifest.
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
