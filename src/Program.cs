@@ -1,0 +1,67 @@
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace TATimesheet
+{
+    static class Program
+    {
+        [DllImport("user32.dll")]
+        static extern bool SetProcessDPIAware();
+
+        [STAThread]
+        static void Main()
+        {
+            // Crisp text on high-DPI laptop screens instead of Windows stretching a blurry bitmap.
+            try { SetProcessDPIAware(); } catch (Exception) { }
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            bool firstInstance;
+            using (var mutex = new Mutex(true, "TATimesheet.SingleInstance", out firstInstance))
+            {
+                if (!firstInstance)
+                {
+                    MessageBox.Show("TA Timesheet is already open. Check your taskbar.", "TA Timesheet",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                Application.ThreadException += (s, e) => ShowError(e.Exception);
+                AppDomain.CurrentDomain.UnhandledException += (s, e) => ShowError(e.ExceptionObject as Exception);
+
+                var store = new DataStore();
+                AppData data;
+                try
+                {
+                    data = store.Load();
+                }
+                catch (Exception ex)
+                {
+                    string moved = null;
+                    try { moved = store.QuarantineBrokenFile(); } catch (Exception) { }
+                    MessageBox.Show(
+                        "Your timesheet data file couldn't be read:\n\n" + ex.Message + "\n\n" +
+                        (moved != null ? "It was set aside as:\n" + moved + "\n\n" : "") +
+                        "Starting fresh. Use File > Restore from backup to get your entries back " +
+                        "(daily backups are in " + store.BackupFolder + ").",
+                        "TA Timesheet", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    data = AppData.CreateDefault();
+                }
+
+                Application.Run(new MainForm(store, data));
+                GC.KeepAlive(mutex);
+            }
+        }
+
+        static void ShowError(Exception ex)
+        {
+            if (ex == null) return;
+            MessageBox.Show("Something went wrong:\n\n" + ex.Message + "\n\nYour saved entries are safe.",
+                "TA Timesheet", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+}
