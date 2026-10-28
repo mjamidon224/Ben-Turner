@@ -12,7 +12,7 @@ namespace TATimesheet
         public DateTime To { get; private set; }
 
         readonly RadioButton rbCustom;
-        readonly DateTimePicker dtFrom, dtTo;
+        readonly ThemedDatePicker dtFrom, dtTo;
 
         public RangeForm(Period current, AppData data, string title)
         {
@@ -26,7 +26,7 @@ namespace TATimesheet
             DateTime last = data.Entries.Count > 0 ? data.Entries.Max(e => e.Date) : today;
 
             var list = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(14, 12, 14, 4), WrapContents = false };
-            list.Controls.Add(new Label { Text = "Which entries?", AutoSize = true, ForeColor = Ui.Slate, Margin = new Padding(3, 0, 3, 8) });
+            list.Controls.Add(Theme.SetRole(new Label { Text = "Which entries?", AutoSize = true, Margin = new Padding(3, 0, 3, 8) }, ThemeRole.Heading));
 
             Option(list, "Pay period on screen  (" + current + ")", current.Start, current.End, true);
             Option(list, "Previous pay period  (" + current.Previous + ")", current.Previous.Start, current.Previous.End, false);
@@ -37,8 +37,8 @@ namespace TATimesheet
 
             var customRow = Ui.Flow();
             rbCustom = new RadioButton { Text = "From", AutoSize = true, Anchor = AnchorStyles.Left };
-            dtFrom = new DateTimePicker { Format = DateTimePickerFormat.Short, Width = 120, Value = current.Start, Anchor = AnchorStyles.Left };
-            dtTo = new DateTimePicker { Format = DateTimePickerFormat.Short, Width = 120, Value = current.End, Anchor = AnchorStyles.Left };
+            dtFrom = new ThemedDatePicker { Format = DateTimePickerFormat.Short, Width = 120, Value = current.Start, Anchor = AnchorStyles.Left };
+            dtTo = new ThemedDatePicker { Format = DateTimePickerFormat.Short, Width = 120, Value = current.End, Anchor = AnchorStyles.Left };
             dtFrom.ValueChanged += (s, e) => rbCustom.Checked = true;
             dtTo.ValueChanged += (s, e) => rbCustom.Checked = true;
             customRow.Controls.AddRange(new Control[] { rbCustom, dtFrom, new Label { Text = "to", AutoSize = true, Anchor = AnchorStyles.Left }, dtTo });

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace TATimesheet
 {
@@ -21,11 +22,11 @@ namespace TATimesheet
         bool jumpDropped;
 
         Label lblPeriod;
-        DateTimePicker dtpJump;
+        ThemedDatePicker dtpJump;
         ComboBox cboName, cboCustomer;
 
         Label lblEditorTitle;
-        DateTimePicker dtpDate;
+        ThemedDatePicker dtpDate;
         ComboBox cboProject, cboLocation, cboStart, cboEnd;
         TextBox txtHours, txtNotes;
         Button btnSave, btnNew, btnDelete;
@@ -35,12 +36,14 @@ namespace TATimesheet
         Label lblWeeks, lblTotal;
         ToolStripStatusLabel lblStatus, lblFile;
         readonly ToolTip tips = new ToolTip();
+        readonly List<ToolStripMenuItem> themeItems = new List<ToolStripMenuItem>();
         Font boldFont, italicFont, totalFont;
 
         public MainForm(DataStore store, AppData data)
         {
             this.store = store;
             this.data = data;
+            Theme.Use(Theme.Resolve(data.Settings.Theme));
 
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -83,23 +86,22 @@ namespace TATimesheet
             Controls.Add(BuildStatusBar());
             if (BuildInfo.IsTest)
             {
-                Controls.Add(new Label
+                Controls.Add(Theme.SetRole(new Label
                 {
                     Text = "TEST COPY \u2013 practice data, kept separate from the real app. Break whatever you want. File > Reset test data starts over.",
                     Dock = DockStyle.Top,
                     AutoSize = false,
                     Height = (int)(Font.Height * 1.9),
                     TextAlign = ContentAlignment.MiddleCenter,
-                    BackColor = Color.FromArgb(255, 196, 0),
-                    ForeColor = Color.Black,
                     Font = boldFont
-                });
+                }, ThemeRole.Banner));
             }
             var menu = BuildMenu();
             Controls.Add(menu);
             MainMenuStrip = menu;
             ResumeLayout(false);
             PerformLayout();
+            ApplyTheme();
 
             AcceptButton = btnSave;
             CancelButton = btnNew;
@@ -109,6 +111,8 @@ namespace TATimesheet
             LoadPeriod(true);
             Shown += OnFirstShown;
             FormClosing += OnClosing;
+            SystemEvents.UserPreferenceChanged += OnWindowsSettingsChanged;
+            FormClosed += (s, e) => SystemEvents.UserPreferenceChanged -= OnWindowsSettingsChanged;
         }
 
         // ---- Layout ---------------------------------------------------------------------------
@@ -126,19 +130,18 @@ namespace TATimesheet
             prev.Anchor = next.Anchor = AnchorStyles.Left;
             tips.SetToolTip(prev, "Previous pay period (Ctrl+PgUp)");
             tips.SetToolTip(next, "Next pay period (Ctrl+PgDn)");
-            lblPeriod = new Label
+            lblPeriod = Theme.SetRole(new Label
             {
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 14F),
-                ForeColor = Ui.Slate,
                 Anchor = AnchorStyles.Left,
                 Margin = new Padding(6, 0, 6, 0)
-            };
+            }, ThemeRole.Heading);
             var today = Ui.Button("This period", (s, e) => GoToPeriod(Period.Containing(DateTime.Today, data.Settings)));
             today.Anchor = AnchorStyles.Left;
             tips.SetToolTip(today, "Jump back to the pay period with today in it (Ctrl+T)");
 
-            dtpJump = new DateTimePicker { Format = DateTimePickerFormat.Short, Width = 120, Anchor = AnchorStyles.Left, Margin = new Padding(10, 3, 3, 3) };
+            dtpJump = new ThemedDatePicker { Format = DateTimePickerFormat.Short, Width = 120, Anchor = AnchorStyles.Left, Margin = new Padding(10, 3, 3, 3) };
             tips.SetToolTip(dtpJump, "Jump to the pay period containing this date");
             dtpJump.DropDown += (s, e) => jumpDropped = true;
             dtpJump.CloseUp += (s, e) => { jumpDropped = false; JumpToPicked(); };
@@ -171,17 +174,16 @@ namespace TATimesheet
         Control BuildEditor()
         {
             // A white "card" holding the editor; plain TableLayoutPanels autosize reliably.
-            var t = new TableLayoutPanel
+            var t = Theme.SetRole(new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 ColumnCount = 7,
                 RowCount = 4,
-                BackColor = Color.White,
                 Padding = new Padding(10, 8, 10, 8),
                 Margin = new Padding(0, 0, 0, 10)
-            };
+            }, ThemeRole.Card);
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
@@ -191,20 +193,19 @@ namespace TATimesheet
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
             for (int i = 0; i < 4; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            lblEditorTitle = new Label
+            lblEditorTitle = Theme.SetRole(new Label
             {
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 10.5F),
-                ForeColor = Ui.Slate,
                 Margin = new Padding(3, 0, 3, 2)
-            };
+            }, ThemeRole.Heading);
             t.Controls.Add(lblEditorTitle, 0, 0);
             t.SetColumnSpan(lblEditorTitle, 7);
 
             string[] labels = { "Date", "Project", "Location", "Start", "End", "Hours", "Notes (just for you, not printed)" };
             for (int i = 0; i < labels.Length; i++) t.Controls.Add(Ui.FieldLabel(labels[i]), i, 1);
 
-            dtpDate = new DateTimePicker
+            dtpDate = new ThemedDatePicker
             {
                 Format = DateTimePickerFormat.Custom,
                 CustomFormat = "ddd M/d/yyyy",
@@ -248,8 +249,8 @@ namespace TATimesheet
             tips.SetToolTip(btnSave, "Enter");
             tips.SetToolTip(btnNew, "Esc \u2013 stop editing and start a new entry (keeps what you typed as a starting point)");
             tips.SetToolTip(copyLast, "Fill in project, location and times from your previous entry (Ctrl+L)");
-            lblMode = new Label { AutoSize = true, ForeColor = Ui.Muted, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) };
-            lblHint = new Label { AutoSize = true, ForeColor = Ui.WarnText, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) };
+            lblMode = Theme.SetRole(new Label { AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) }, ThemeRole.Muted);
+            lblHint = Theme.SetRole(new Label { AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) }, ThemeRole.Warn);
             buttons.Controls.AddRange(new Control[] { btnSave, btnNew, btnDelete, copyLast, lblMode, lblHint });
             t.Controls.Add(buttons, 0, 3);
             t.SetColumnSpan(buttons, 7);
@@ -268,7 +269,7 @@ namespace TATimesheet
             {
                 int m;
                 string t = c.Text.Trim();
-                c.BackColor = t.Length == 0 || TimeUtil.TryParseTime(t, out m) ? SystemColors.Window : Ui.WarnTint;
+                c.BackColor = t.Length == 0 || TimeUtil.TryParseTime(t, out m) ? Theme.Current.Input : Theme.Current.WarnTint;
                 string norm = TimeUtil.NormalizeTime(t);
                 if (norm != c.Text) c.Text = norm;
             };
@@ -305,10 +306,10 @@ namespace TATimesheet
             e.DrawBackground();
             TextRenderer.DrawText(e.Graphics, (string)c.Items[e.Index], favourite ? boldFont : e.Font,
                 new Rectangle(e.Bounds.X + 3, e.Bounds.Y, e.Bounds.Width - 3, e.Bounds.Height),
-                selected ? SystemColors.HighlightText : (favourite ? Ui.Green : SystemColors.ControlText),
+                selected ? SystemColors.HighlightText : (favourite ? Theme.Current.Accent : Theme.Current.Text),
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             if (favourite && e.Index == favourites - 1)
-                using (var pen = new Pen(Color.Silver))
+                using (var pen = new Pen(Theme.Current.Border))
                     e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
         }
 
@@ -326,10 +327,8 @@ namespace TATimesheet
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                BackgroundColor = SystemColors.Window,
                 BorderStyle = BorderStyle.FixedSingle,
                 CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-                GridColor = Color.FromArgb(226, 229, 232),
                 EnableHeadersVisualStyles = false,
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
                 StandardTab = true,
@@ -338,14 +337,8 @@ namespace TATimesheet
             };
             grid.ColumnHeadersHeight = (int)(Font.Height * 2.1);
             grid.RowTemplate.Height = (int)(Font.Height * 1.9);
-            var head = grid.ColumnHeadersDefaultCellStyle;
-            head.BackColor = Ui.Slate;
-            head.ForeColor = Color.White;
-            head.SelectionBackColor = Ui.Slate;
-            head.Font = new Font("Segoe UI Semibold", 9F);
-            head.Padding = new Padding(4, 0, 4, 0);
-            grid.DefaultCellStyle.SelectionBackColor = Ui.Selection;
-            grid.DefaultCellStyle.SelectionForeColor = Color.Black;
+            grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F);
+            grid.ColumnHeadersDefaultCellStyle.Padding = new Padding(4, 0, 4, 0);
             grid.DefaultCellStyle.Padding = new Padding(4, 0, 4, 0);
 
             AddColumn("Day", 6, false);
@@ -415,14 +408,14 @@ namespace TATimesheet
 
             var totals = Ui.Flow();
             totals.Anchor = AnchorStyles.Left;
-            lblTotal = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15F), ForeColor = Ui.Green, Anchor = AnchorStyles.Left };
-            lblWeeks = new Label { AutoSize = true, Font = new Font("Segoe UI", 10F), ForeColor = Ui.Slate, Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) };
+            lblTotal = Theme.SetRole(new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15F), Anchor = AnchorStyles.Left }, ThemeRole.Accent);
+            lblWeeks = Theme.SetRole(new Label { AutoSize = true, Font = new Font("Segoe UI", 10F), Anchor = AnchorStyles.Left, Margin = new Padding(12, 0, 3, 0) }, ThemeRole.Heading);
             totals.Controls.Add(lblTotal);
             totals.Controls.Add(lblWeeks);
 
             var exports = Ui.Flow();
             exports.Anchor = AnchorStyles.Right;
-            exports.Controls.Add(new Label { Text = "Export:", AutoSize = true, ForeColor = Ui.Slate, Anchor = AnchorStyles.Left });
+            exports.Controls.Add(Ui.InlineLabel("Export:"));
             var word = Ui.PrimaryButton("Word timesheet", (s, e) => ExportWord());
             var pdf = Ui.PrimaryButton("PDF", (s, e) => ExportPdf());
             var excel = Ui.Button("Excel", (s, e) => ExportData(true));
@@ -488,6 +481,16 @@ namespace TATimesheet
             export.DropDownItems.Add(Item("Print pre&view...", Keys.Control | Keys.P, PrintPreview));
             export.DropDownItems.Add(Item("P&rint...", Keys.None, PrintNow));
 
+            var view = new ToolStripMenuItem("&View");
+            foreach (var choice in new[] { new[] { Theme.SystemName, "Match &Windows" }, new[] { Theme.LightName, "&Light" }, new[] { Theme.DarkName, "&Dark" } })
+            {
+                string value = choice[0];
+                var item = Item(choice[1], Keys.None, () => SetTheme(value));
+                item.Tag = value;
+                themeItems.Add(item);
+                view.DropDownItems.Add(item);
+            }
+
             var tools = new ToolStripMenuItem("&Tools");
             tools.DropDownItems.Add(Item("Manage &dropdown history...", Keys.Control | Keys.H, ManageHistory));
             tools.DropDownItems.Add(Item("&Settings...", Keys.None, ShowSettings));
@@ -496,7 +499,7 @@ namespace TATimesheet
             help.DropDownItems.Add(Item("&How to use", Keys.F1, ShowHelp));
             help.DropDownItems.Add(Item("&About", Keys.None, ShowAbout));
 
-            m.Items.AddRange(new ToolStripItem[] { file, entry, per, export, tools, help });
+            m.Items.AddRange(new ToolStripItem[] { file, entry, per, export, view, tools, help });
             return m;
         }
 
@@ -509,6 +512,57 @@ namespace TATimesheet
                 else i.ShortcutKeys = keys;
             }
             return i;
+        }
+
+        // ---- Theme ----------------------------------------------------------------------------
+
+        void SetTheme(string value)
+        {
+            data.Settings.Theme = value;
+            ApplyTheme();
+            Persist("Look changed");
+        }
+
+        void ApplyTheme()
+        {
+            Theme.Use(Theme.Resolve(data.Settings.Theme));
+            var t = Theme.Current;
+            SuspendLayout();
+            Theme.Apply(this);
+            ApplyGridTheme();
+            lblFile.LinkColor = lblFile.ActiveLinkColor = lblFile.VisitedLinkColor = t.Link;
+            ResumeLayout();
+            foreach (var item in themeItems) item.Checked = (string)item.Tag == data.Settings.Theme;
+            if (grid.Rows.Count > 0)
+            {
+                RefreshGrid();
+                HighlightEditorRow();
+            }
+            Invalidate(true);
+        }
+
+        void ApplyGridTheme()
+        {
+            var t = Theme.Current;
+            grid.BackgroundColor = t.GridBack;
+            grid.GridColor = t.GridLine;
+            grid.DefaultCellStyle.BackColor = t.GridBack;
+            grid.DefaultCellStyle.ForeColor = t.Text;
+            grid.DefaultCellStyle.SelectionBackColor = t.Selection;
+            grid.DefaultCellStyle.SelectionForeColor = t.SelectionText;
+            var head = grid.ColumnHeadersDefaultCellStyle;
+            head.BackColor = t.HeaderBack;
+            head.ForeColor = t.HeaderText;
+            head.SelectionBackColor = t.HeaderBack;
+            head.SelectionForeColor = t.HeaderText;
+        }
+
+        /// <summary>Follows Windows when it switches between light and dark (if set to Match Windows).</summary>
+        void OnWindowsSettingsChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category != UserPreferenceCategory.General || data.Settings.Theme != Theme.SystemName) return;
+            if (Theme.Resolve(Theme.SystemName) == Theme.Current || !IsHandleCreated) return;
+            BeginInvoke(new Action(ApplyTheme));
         }
 
         // ---- Period ---------------------------------------------------------------------------
@@ -651,11 +705,11 @@ namespace TATimesheet
             row.Tag = e;
             if (e.Date == DateTime.Today) row.Cells[1].Style.Font = boldFont;
             if (e.Date.DayOfWeek == DayOfWeek.Saturday || e.Date.DayOfWeek == DayOfWeek.Sunday)
-                row.DefaultCellStyle.BackColor = Ui.WeekendTint;
+                row.DefaultCellStyle.BackColor = Theme.Current.WeekendTint;
             if (e.HoursMismatch)
             {
                 var c = row.Cells["Hours"];
-                c.Style.BackColor = Ui.WarnTint;
+                c.Style.BackColor = Theme.Current.WarnTint;
                 c.ToolTipText = string.Format("{0}\u2013{1} works out to {2} h, but {3} h is entered.",
                     e.Start, e.End, TimeUtil.FormatHours(e.ComputedHours), TimeUtil.FormatHours(e.Hours));
             }
@@ -666,11 +720,11 @@ namespace TATimesheet
             int i = grid.Rows.Add(date.ToString("ddd", CultureInfo.CurrentCulture), TimeUtil.FormatDate(date), "click to add", "", "", "", "", "");
             var row = grid.Rows[i];
             row.Tag = date;
-            row.DefaultCellStyle.ForeColor = Ui.Muted;
+            row.DefaultCellStyle.ForeColor = Theme.Current.Muted;
             if (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
-                row.DefaultCellStyle.BackColor = Ui.WeekendTint;
+                row.DefaultCellStyle.BackColor = Theme.Current.WeekendTint;
             row.Cells["Project"].Style.Font = italicFont;
-            row.Cells["Project"].Style.ForeColor = Color.FromArgb(170, 176, 181);
+            row.Cells["Project"].Style.ForeColor = Theme.Current.Placeholder;
             if (date == DateTime.Today) row.Cells[1].Style.Font = boldFont;
         }
 
@@ -679,8 +733,9 @@ namespace TATimesheet
             int i = grid.Rows.Add("", "", period.Weeks == 1 ? "Week total" : "Week " + week + " total", "", "", "", TimeUtil.FormatHours(hours), "");
             var row = grid.Rows[i];
             row.Tag = "total";
-            row.DefaultCellStyle.BackColor = Ui.GreenTint;
-            row.DefaultCellStyle.SelectionBackColor = Ui.GreenTint;
+            row.DefaultCellStyle.BackColor = Theme.Current.AccentTint;
+            row.DefaultCellStyle.SelectionBackColor = Theme.Current.AccentTint;
+            row.DefaultCellStyle.SelectionForeColor = Theme.Current.Text;
             row.DefaultCellStyle.Font = totalFont;
         }
 
@@ -760,7 +815,7 @@ namespace TATimesheet
                 }
                 txtNotes.Text = "";
                 txtHours.Text = TimeUtil.FormatHours(TimeUtil.ComputeHours(cboStart.Text, cboEnd.Text));
-                cboStart.BackColor = cboEnd.BackColor = SystemColors.Window;
+                ResetInputColors();
             }
             finally
             {
@@ -784,7 +839,7 @@ namespace TATimesheet
                 cboEnd.Text = e.End;
                 txtHours.Text = TimeUtil.FormatHours(e.Hours);
                 txtNotes.Text = e.Notes;
-                cboStart.BackColor = cboEnd.BackColor = SystemColors.Window;
+                ResetInputColors();
             }
             finally
             {
@@ -963,9 +1018,15 @@ namespace TATimesheet
             cboStart.SelectAll();
         }
 
+        void ResetInputColors()
+        {
+            foreach (Control c in new Control[] { cboProject, cboLocation, cboStart, cboEnd, txtHours, txtNotes })
+                c.BackColor = Theme.Current.Input;
+        }
+
         void Problem(Control c, string message)
         {
-            c.BackColor = Ui.WarnTint;
+            c.BackColor = Theme.Current.WarnTint;
             lblStatus.Text = message;
             Ui.Error(this, message);
             c.Focus();

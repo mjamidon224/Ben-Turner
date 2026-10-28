@@ -142,7 +142,8 @@ namespace TATimesheet
                         new XAttribute("filePrefix", s.FilePrefix),
                         new XAttribute("logoPath", s.LogoPath),
                         new XAttribute("openAfterExport", s.OpenAfterExport),
-                        new XAttribute("windowBounds", s.WindowBounds)),
+                        new XAttribute("windowBounds", s.WindowBounds),
+                        new XAttribute("theme", s.Theme)),
                     new XElement("History",
                         List("Names", d.Names), List("Customers", d.Customers),
                         List("Projects", d.Projects), List("Locations", d.Locations)),
@@ -185,6 +186,8 @@ namespace TATimesheet
                 d.Settings.LogoPath = Attr(s, "logoPath");
                 if (bool.TryParse(Attr(s, "openAfterExport"), out b)) d.Settings.OpenAfterExport = b;
                 d.Settings.WindowBounds = Attr(s, "windowBounds");
+                string theme = Attr(s, "theme");
+                if (theme == Theme.LightName || theme == Theme.DarkName) d.Settings.Theme = theme;
             }
 
             var hist = root.Element("History");

@@ -14,6 +14,7 @@ A Windows 11 desktop app for logging hours and producing the Turner Automation *
   - **CSV**: the same entries as plain text.
 - **Import** old Word timesheets (`TA_Timesheet_*.docx`, several at once) or CSV files. Entries that are already in the app are skipped.
 - **Saves on every change.** A backup is made automatically each day.
+- **Dark mode.** **View > Light / Dark / Match Windows**. Match Windows is the default and follows your Windows setting live. The title bar, menus, grid, dropdowns and dialogs all switch.
 
 ## Install (Windows 10 / 11)
 
@@ -53,7 +54,9 @@ Name and Customer at the top right are saved per pay period. They're what gets p
 | Ctrl+H | Manage dropdown history |
 | F1 | Help |
 
-**Tools > Settings** controls the pay period length (default 2 weeks starting Monday 10/26/2026), the time-dropdown step, the export folder, the file name prefix and the logo.
+**View** switches between Light, Dark and Match Windows.
+
+**Tools > Settings** controls the look, the pay period length (default 2 weeks starting Monday 10/26/2026), the time-dropdown step, the export folder, the file name prefix and the logo.
 
 ## Your data
 
@@ -78,6 +81,7 @@ The code is plain C# 5 / WinForms on .NET Framework 4.x with no NuGet packages. 
 | `src/MainForm*.cs` | Main window and its actions |
 | `src/Models.cs`, `src/TimeUtil.cs` | Entries, pay periods, time parsing |
 | `src/BuildInfo.cs` | Real vs. test copy differences and the test copy's sample entries |
+| `src/Theme.cs` | Light/dark palettes and the code that themes every control |
 | `src/DataStore.cs` | Saving, loading and daily backups |
 | `src/DocxExporter.cs` | Word timesheet |
 | `src/SheetLayout.cs`, `src/PdfExporter.cs`, `src/PrintSupport.cs` | PDF and printing (shared page layout) |

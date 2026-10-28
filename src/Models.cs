@@ -75,6 +75,7 @@ namespace TATimesheet
         public string LogoPath = "";
         public bool OpenAfterExport = true;
         public string WindowBounds = "";  // "x,y,w,h,maximized"
+        public string Theme = TATimesheet.Theme.SystemName; // "system", "light" or "dark"
     }
 
     public class AppData

@@ -22,21 +22,40 @@ namespace TATimesheet
             Size = new Size(560, 520);
             SuspendLayout();
 
-            var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 4) };
-            tabs.TabPages.Add(Page("Projects", data.Projects));
-            tabs.TabPages.Add(Page("Locations", data.Locations));
-            tabs.TabPages.Add(Page("Customers", data.Customers));
-            tabs.TabPages.Add(Page("Names", data.Names));
+            // Toggle buttons instead of a TabControl: Windows tab headers can't be themed dark.
+            var tabRow = Ui.Flow();
+            tabRow.Dock = DockStyle.Top;
+            tabRow.Padding = new Padding(10, 0, 10, 4);
+            var pages = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10, 0, 10, 0) };
+            var titles = new[] { "Projects", "Locations", "Customers", "Names" };
+            var sources = new[] { data.Projects, data.Locations, data.Customers, data.Names };
+            for (int i = 0; i < titles.Length; i++)
+            {
+                var page = Page(titles[i], sources[i]);
+                page.Visible = i == 0;
+                pages.Controls.Add(page);
+                var tab = Theme.SetRole(new RadioButton
+                {
+                    Text = titles[i],
+                    Appearance = Appearance.Button,
+                    AutoSize = true,
+                    Checked = i == 0,
+                    Padding = new Padding(10, 2, 10, 2),
+                    Margin = new Padding(0, 0, 4, 0),
+                    TextAlign = ContentAlignment.MiddleCenter
+                }, ThemeRole.Tab);
+                tab.CheckedChanged += (s, e) => { if (((RadioButton)s).Checked) ShowPage(pages, page); };
+                tabRow.Controls.Add(tab);
+            }
 
-            var top = new Label
+            var top = Theme.SetRole(new Label
             {
                 Text = "Top of the list shows first in the dropdown. Removing something here doesn't touch your saved entries.",
                 Dock = DockStyle.Top,
                 AutoSize = false,
-                Height = 40,
-                ForeColor = Ui.Muted,
+                Height = 44,
                 Padding = new Padding(10, 8, 10, 0)
-            };
+            }, ThemeRole.Muted);
 
             Button ok;
             var buttons = Ui.DialogButtons(this, out ok);
@@ -46,19 +65,22 @@ namespace TATimesheet
             buttons.Controls.Add(rebuild);
             rebuild.Margin = new Padding(3, 3, 60, 3);
 
-            var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10, 4, 10, 0) };
-            body.Controls.Add(tabs);
-            Controls.Add(body);
+            Controls.Add(pages);
+            Controls.Add(tabRow);
             Controls.Add(top);
             Controls.Add(buttons);
             ResumeLayout(false);
             PerformLayout();
         }
 
-        TabPage Page(string title, List<string> items)
+        static void ShowPage(Panel pages, Control page)
         {
-            var page = new TabPage(title) { Padding = new Padding(8), UseVisualStyleBackColor = true };
-            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
+            foreach (Control c in pages.Controls) c.Visible = c == page;
+        }
+
+        Control Page(string title, List<string> items)
+        {
+            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Padding = new Padding(0, 6, 0, 0) };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -94,8 +116,7 @@ namespace TATimesheet
             t.Controls.Add(add, 1, 0);
             t.Controls.Add(list, 0, 1);
             t.Controls.Add(side, 1, 1);
-            page.Controls.Add(t);
-            return page;
+            return t;
         }
 
         static Button Wide(Button b)

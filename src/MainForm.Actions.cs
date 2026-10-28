@@ -145,6 +145,8 @@ namespace TATimesheet
                 dlg.Height = Math.Min(900, Screen.FromControl(this).WorkingArea.Height - 80);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.Text = "Print preview \u2013 " + period;
+                // The preview's own toolbar icons are dark; keep that toolbar light in dark mode.
+                foreach (var bar in dlg.Controls.OfType<ToolStrip>()) bar.Renderer = new ToolStripProfessionalRenderer();
                 dlg.ShowDialog(this);
             }
         }
@@ -361,6 +363,7 @@ namespace TATimesheet
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
             }
             Persist("Settings saved");
+            ApplyTheme();
             FillTimeCombos();
             if (oldWeeks != data.Settings.PeriodWeeks || oldAnchor != data.Settings.PeriodAnchor)
             {
@@ -386,6 +389,8 @@ namespace TATimesheet
                 "  Word timesheet = the exact customer timesheet you used to make by hand (TA_Timesheet_MMDDYY.docx).\n" +
                 "  PDF = same thing, ready to email. Print... = preview and print.\n" +
                 "  Excel / CSV = all your entries for any date range, with totals by project and week.\n\n" +
+                "LIGHT / DARK\n" +
+                "  View menu: Light, Dark, or Match Windows (follows your Windows setting).\n\n" +
                 "SHORTCUTS\n" +
                 "  Enter save    Esc clear    Ctrl+L copy last entry    Ctrl+PgUp/PgDn change period\n" +
                 "  Ctrl+T this period    Ctrl+E Word    Ctrl+Shift+E PDF    Ctrl+P print preview\n\n" +

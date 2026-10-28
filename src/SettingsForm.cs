@@ -10,8 +10,8 @@ namespace TATimesheet
     {
         readonly AppSettings settings;
         readonly TextBox txtName, txtFolder, txtPrefix, txtLogo;
-        readonly ComboBox cboWeeks, cboStep;
-        readonly DateTimePicker dtAnchor;
+        readonly ComboBox cboWeeks, cboStep, cboTheme;
+        readonly ThemedDatePicker dtAnchor;
         readonly CheckBox chkOpen;
         readonly Label lblPreview;
 
@@ -29,12 +29,17 @@ namespace TATimesheet
             txtName = new TextBox { Text = settings.DefaultName, Dock = DockStyle.Fill };
             Row(t, "Your name", txtName, null, "Used on new pay periods. You can still change it per period on the main screen.");
 
+            cboTheme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+            cboTheme.Items.AddRange(new object[] { "Match Windows", "Light", "Dark" });
+            cboTheme.SelectedIndex = settings.Theme == Theme.LightName ? 1 : settings.Theme == Theme.DarkName ? 2 : 0;
+            Row(t, "Look", cboTheme, null, "Match Windows follows your Windows light/dark setting.");
+
             cboWeeks = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
             cboWeeks.Items.AddRange(new object[] { "1 week", "2 weeks", "3 weeks", "4 weeks" });
             cboWeeks.SelectedIndex = Math.Max(0, Math.Min(3, settings.PeriodWeeks - 1));
             Row(t, "Pay period length", cboWeeks, null, null);
 
-            dtAnchor = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dddd M/d/yyyy", Value = settings.PeriodAnchor, Width = 200 };
+            dtAnchor = new ThemedDatePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dddd M/d/yyyy", Value = settings.PeriodAnchor, Width = 200 };
             Row(t, "A pay period starts on", dtAnchor, null, "Any date that begins a pay period, e.g. Monday 10/26/2026. Periods repeat from there.");
 
             cboStep = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
@@ -49,7 +54,7 @@ namespace TATimesheet
 
             txtPrefix = new TextBox { Text = settings.FilePrefix, Dock = DockStyle.Fill };
             txtPrefix.TextChanged += (s, e) => UpdatePreview();
-            lblPreview = new Label { AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(3, 0, 3, 8) };
+            lblPreview = Theme.SetRole(new Label { AutoSize = true, Margin = new Padding(3, 0, 3, 8) }, ThemeRole.Muted);
             Row(t, "File name starts with", txtPrefix, null, null);
             int previewRow = t.RowCount++;
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -89,7 +94,7 @@ namespace TATimesheet
             int r = t.RowCount;
             t.RowCount = r + 1;
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            t.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, ForeColor = Ui.Slate, Margin = new Padding(3, 6, 12, 3) }, 0, r);
+            t.Controls.Add(Theme.SetRole(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 12, 3) }, ThemeRole.Heading), 0, r);
             input.Anchor = AnchorStyles.Left | AnchorStyles.Right;
             if (input is CheckBox || input is LinkLabel) input.Anchor = AnchorStyles.Left;
             t.Controls.Add(input, 1, r);
@@ -98,7 +103,7 @@ namespace TATimesheet
             {
                 t.RowCount++;
                 t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-                var h = new Label { Text = help, AutoSize = true, ForeColor = Ui.Muted, MaximumSize = new Size(420, 0), Margin = new Padding(3, 0, 3, 8) };
+                var h = Theme.SetRole(new Label { Text = help, AutoSize = true, MaximumSize = new Size(420, 0), Margin = new Padding(3, 0, 3, 8) }, ThemeRole.Muted);
                 t.Controls.Add(h, 1, r + 1);
                 t.SetColumnSpan(h, 2);
             }
@@ -161,6 +166,7 @@ namespace TATimesheet
             settings.FilePrefix = prefix;
             settings.LogoPath = logo;
             settings.OpenAfterExport = chkOpen.Checked;
+            settings.Theme = cboTheme.SelectedIndex == 1 ? Theme.LightName : cboTheme.SelectedIndex == 2 ? Theme.DarkName : Theme.SystemName;
             DialogResult = DialogResult.OK;
         }
     }

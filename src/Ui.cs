@@ -5,18 +5,9 @@ using System.Windows.Forms;
 
 namespace TATimesheet
 {
-    /// <summary>Shared look and small control factories.</summary>
+    /// <summary>Shared look and small control factories. Colors come from Theme.Current.</summary>
     public static class Ui
     {
-        public static readonly Color Green = Color.FromArgb(18, 160, 58);
-        public static readonly Color Slate = Color.FromArgb(51, 61, 69);
-        public static readonly Color GreenTint = Color.FromArgb(226, 244, 229);
-        public static readonly Color Selection = Color.FromArgb(198, 234, 205);
-        public static readonly Color WarnTint = Color.FromArgb(255, 232, 196);
-        public static readonly Color WarnText = Color.FromArgb(176, 92, 0);
-        public static readonly Color Muted = Color.FromArgb(120, 128, 134);
-        public static readonly Color WeekendTint = Color.FromArgb(247, 248, 249);
-
         public static Font BaseFont()
         {
             return new Font("Segoe UI", 9F);
@@ -24,19 +15,18 @@ namespace TATimesheet
 
         public static Label FieldLabel(string text)
         {
-            return new Label
+            return Theme.SetRole(new Label
             {
                 Text = text,
                 AutoSize = true,
-                ForeColor = Slate,
                 Anchor = AnchorStyles.Left | AnchorStyles.Bottom,
                 Margin = new Padding(3, 4, 3, 1)
-            };
+            }, ThemeRole.Heading);
         }
 
         public static Label InlineLabel(string text)
         {
-            return new Label { Text = text, AutoSize = true, ForeColor = Slate, Anchor = AnchorStyles.Left, Margin = new Padding(10, 0, 3, 0) };
+            return Theme.SetRole(new Label { Text = text, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(10, 0, 3, 0) }, ThemeRole.Heading);
         }
 
         /// <summary>Editable dropdown that remembers past values and autocompletes as you type.</summary>
@@ -145,6 +135,7 @@ namespace TATimesheet
             f.MinimizeBox = false;
             f.ShowInTaskbar = false;
             f.StartPosition = FormStartPosition.CenterParent;
+            f.Load += (s, e) => Theme.Apply(f);
         }
     }
 }
