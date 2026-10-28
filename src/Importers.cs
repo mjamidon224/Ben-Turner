@@ -77,7 +77,7 @@ namespace TATimesheet
         }
 
         /// <summary>Recognises a header row and maps column names to positions.</summary>
-        static Dictionary<string, int> HeaderMap(List<string> cells)
+        internal static Dictionary<string, int> HeaderMap(List<string> cells)
         {
             var map = new Dictionary<string, int>();
             for (int i = 0; i < cells.Count; i++)
@@ -105,7 +105,7 @@ namespace TATimesheet
             return cols.TryGetValue(key, out i) && i < cells.Count ? (cells[i] ?? "").Trim() : "";
         }
 
-        static TimeEntry RowToEntry(List<string> cells, Dictionary<string, int> cols)
+        internal static TimeEntry RowToEntry(List<string> cells, Dictionary<string, int> cols)
         {
             DateTime date;
             if (!TimeUtil.TryParseDate(Get(cells, cols, "date"), out date)) return null;
@@ -132,6 +132,22 @@ namespace TATimesheet
             if (TimeUtil.TryParseHours(Get(cells, cols, "hours"), out h)) e.Hours = h;
             else e.Hours = e.ComputedHours;
             return e.IsBlank ? null : e;
+        }
+
+        public static ImportResult ReadPdf(string path)
+        {
+            return PdfTimesheetReader.Read(path);
+        }
+
+        /// <summary>Reads a .docx, .pdf or .csv timesheet, by extension.</summary>
+        public static ImportResult ReadAny(string path)
+        {
+            switch (Path.GetExtension(path).ToLowerInvariant())
+            {
+                case ".pdf": return ReadPdf(path);
+                case ".csv": return ReadCsv(path);
+                default: return ReadDocx(path);
+            }
         }
 
         // ---- CSV -------------------------------------------------------------------------------
@@ -202,6 +218,43 @@ namespace TATimesheet
                 && string.Equals(a.Start, b.Start, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(a.End, b.End, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(a.Project.Trim(), b.Project.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>How many of a file's entries aren't in the app yet.</summary>
+        public static int CountNew(AppData data, ImportResult r)
+        {
+            return r.Entries.Count(e => !data.Entries.Any(x => SameEntry(x, e)));
+        }
+
+        /// <summary>
+        /// Files with the given extensions in a folder (and optionally its subfolders), alphabetically.
+        /// Skips Word's ~$ lock files, hidden/system folders (AppData and the like), links, and folders it can't open.
+        /// </summary>
+        public static IEnumerable<string> FindFiles(string root, bool subfolders, IList<string> extensions, Func<bool> cancelled)
+        {
+            var pending = new Stack<string>();
+            pending.Push(root);
+            while (pending.Count > 0)
+            {
+                if (cancelled()) yield break;
+                string dir = pending.Pop();
+                string[] files = new string[0], dirs = new string[0];
+                try { files = Directory.GetFiles(dir); } catch (Exception) { }
+                foreach (var f in files.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                {
+                    if (Path.GetFileName(f).StartsWith("~$")) continue;
+                    if (extensions.Contains(Path.GetExtension(f).ToLowerInvariant())) yield return f;
+                }
+                if (!subfolders) continue;
+                try { dirs = Directory.GetDirectories(dir); } catch (Exception) { }
+                foreach (var d in dirs.OrderByDescending(x => x, StringComparer.OrdinalIgnoreCase))
+                {
+                    FileAttributes attr;
+                    try { attr = File.GetAttributes(d); } catch (Exception) { continue; }
+                    if ((attr & (FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint)) != 0) continue;
+                    pending.Push(d);
+                }
+            }
         }
 
         /// <summary>Adds imported entries (skipping ones already there) and feeds the dropdown history.</summary>

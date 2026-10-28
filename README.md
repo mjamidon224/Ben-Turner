@@ -20,7 +20,11 @@ A Windows 11 desktop app for logging hours and producing the Turner Automation *
   - **Print / Print preview**.
   - **Excel (.xlsx)**: every entry in any date range, plus a summary sheet with hours by project and by week.
   - **CSV**: the same entries as plain text.
-- **Import** old Word timesheets (`TA_Timesheet_*.docx`, several at once) or CSV files. Entries that are already in the app are skipped.
+- **Import old timesheets from a folder (Ctrl+I).** Pick a folder; the app searches it and every subfolder for PDF and Word timesheets.
+  - Reading runs in the background, and you see what each file contains (entries, hours, dates) before ticking which ones to bring in.
+  - PDFs are read by their text. Ones saved from Word, "Microsoft Print to PDF" or this app work; scanned or photographed timesheets can't be read.
+  - Entries already in the app are skipped, so re-running an import or having the same timesheet as both .docx and .pdf is harmless.
+  - You can also import single files (.pdf/.docx) or a CSV file.
 - **Saves on every change.** A backup is made automatically each day.
 - **Dark mode.** **View > Light / Dark / Match Windows**. Match Windows is the default and follows your Windows setting live. The title bar, menus, grid, dropdowns and dialogs all switch.
 
@@ -57,7 +61,7 @@ Nothing else needs to be installed. The app uses the .NET Framework 4.8 that com
 
 ## Using it
 
-1. **First run:** the app offers to import your old Word timesheets. Say yes and select all the `TA_Timesheet_*.docx` files. This fills in your history and dropdowns.
+1. **First run:** the app offers to import your old timesheets. Say yes, point it at the folder they're in (subfolders are searched too), and import what it finds. This fills in your history and dropdowns.
 2. **Log a day:** the date already points at the next empty day. Check the project and location, set Start and End, add a note if you want one, and press **Enter**. The entry is saved and the date moves to the next day.
 3. **Fix something:** click a row in the list to edit it. Press **Delete** to remove it, or right-click and choose **Copy to next day**. **Esc** stops editing.
 4. **Send the timesheet:** click **Word timesheet** or **PDF** at the bottom. The file name defaults to `TA_Timesheet_102626.docx` (the period's start date) and the file opens when it's done.
@@ -108,5 +112,6 @@ The code is plain C# 5 / WinForms on .NET Framework 4.x with no NuGet packages. 
 | `src/SheetLayout.cs`, `src/PdfExporter.cs`, `src/PrintSupport.cs` | PDF and printing (shared page layout) |
 | `src/DataExporters.cs` | Excel and CSV (entries and reports) |
 | `src/Reports.cs`, `src/ReportLayout.cs`, `src/BarChart.cs`, `src/ReportsForm.cs` | Historical reports: numbers, PDF/print layout, chart, window |
-| `src/Importers.cs` | Word and CSV import |
+| `src/Importers.cs`, `src/ImportForm.cs` | Word/CSV import, folder search, the import window |
+| `src/PdfReader.cs`, `src/PdfText.cs`, `src/PdfImport.cs` | PDF import: a small PDF parser, positioned text extraction, and timesheet table rebuilding |
 | `tests/SmokeTest.cs` | Headless checks run by `build.sh test` |

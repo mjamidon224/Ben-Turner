@@ -287,17 +287,28 @@ namespace TATimesheet
 
         // ---- Imports ----------------------------------------------------------------------------
 
-        void ImportDocx()
+        void ImportFolder()
         {
-            RunImport("Import Word timesheets", "Word timesheets (*.docx)|*.docx", Importer.ReadDocx);
+            List<FoundFile> picked;
+            using (var dlg = new ImportForm(data, ExportFolder()))
+            {
+                if (dlg.ShowDialog(this) != DialogResult.OK || dlg.Selected == null || dlg.Selected.Count == 0) return;
+                picked = dlg.Selected;
+            }
+            MergeImports(picked, "Import old timesheets");
+        }
+
+        void ImportFiles()
+        {
+            PickAndImport("Import timesheet files", "Timesheets (*.pdf;*.docx)|*.pdf;*.docx|PDF files (*.pdf)|*.pdf|Word files (*.docx)|*.docx");
         }
 
         void ImportCsv()
         {
-            RunImport("Import CSV", "CSV files (*.csv)|*.csv", Importer.ReadCsv);
+            PickAndImport("Import CSV", "CSV files (*.csv)|*.csv");
         }
 
-        void RunImport(string title, string filter, Func<string, ImportResult> read)
+        void PickAndImport(string title, string filter)
         {
             string[] files;
             using (var dlg = new OpenFileDialog())
@@ -309,29 +320,34 @@ namespace TATimesheet
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
                 files = dlg.FileNames;
             }
-
-            var summary = new MergeSummary();
-            int before = data.Entries.Count;
+            var results = new List<FoundFile>();
             Cursor = Cursors.WaitCursor;
             try
             {
                 foreach (var f in files)
                 {
-                    try
-                    {
-                        var r = read(f);
-                        if (r.Entries.Count == 0) summary.Problems.Add(Path.GetFileName(f) + ": no timesheet rows found");
-                        Importer.Merge(data, r, summary);
-                    }
-                    catch (Exception ex)
-                    {
-                        summary.Problems.Add(Path.GetFileName(f) + ": " + ex.Message);
-                    }
+                    var found = new FoundFile { Path = f };
+                    try { found.Result = Importer.ReadAny(f); }
+                    catch (Exception ex) { found.Error = ex.Message; }
+                    results.Add(found);
                 }
             }
             finally
             {
                 Cursor = Cursors.Default;
+            }
+            MergeImports(results, title);
+        }
+
+        void MergeImports(List<FoundFile> files, string title)
+        {
+            var summary = new MergeSummary();
+            int before = data.Entries.Count;
+            foreach (var f in files)
+            {
+                if (f.Error != null) { summary.Problems.Add(Path.GetFileName(f.Path) + ": " + f.Error); continue; }
+                if (f.Result.Entries.Count == 0) summary.Problems.Add(Path.GetFileName(f.Path) + ": no timesheet rows found");
+                Importer.Merge(data, f.Result, summary);
             }
 
             Persist(string.Format("Imported {0} entries", summary.Added));
@@ -344,7 +360,8 @@ namespace TATimesheet
             if (mismatched > 0)
                 msg += string.Format("\n\nHeads up: {0} imported row{1} bill different hours than the start/end times add up to. " +
                                      "They're highlighted orange in the Hours column \u2013 hover for details.", mismatched, mismatched == 1 ? "" : "s");
-            if (summary.Problems.Count > 0) msg += "\n\nProblems:\n" + string.Join("\n", summary.Problems);
+            if (summary.Problems.Count > 0) msg += "\n\nProblems:\n" + string.Join("\n", summary.Problems.Take(15)) +
+                                                    (summary.Problems.Count > 15 ? "\n..." : "");
             if (summary.Added > 0)
             {
                 var latest = data.Entries.Skip(before).Max(e => e.Date);
@@ -496,6 +513,9 @@ namespace TATimesheet
                 "EDITING\n" +
                 "  Click a row to edit it. Delete key removes it. Right-click > Copy to next day.\n" +
                 "  Esc starts a fresh entry. Orange hours = hours don't match the start/end times.\n\n" +
+                "IMPORTING OLD TIMESHEETS\n" +
+                "  File > Import old timesheets from a folder (Ctrl+I): pick a folder, it searches every subfolder for\n" +
+                "  PDF and Word timesheets, shows what's in each, and imports the ones you tick. Duplicates are skipped.\n\n" +
                 "SENDING THE TIMESHEET\n" +
                 "  Word timesheet = the exact customer timesheet you used to make by hand (TA_Timesheet_MMDDYY.docx).\n" +
                 "  PDF = same thing, ready to email. Print... = preview and print.\n" +

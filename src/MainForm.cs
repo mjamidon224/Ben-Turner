@@ -480,7 +480,8 @@ namespace TATimesheet
             var m = new MenuStrip();
 
             var file = new ToolStripMenuItem("&File");
-            file.DropDownItems.Add(Item("&Import Word timesheets (.docx)...", Keys.None, ImportDocx));
+            file.DropDownItems.Add(Item("&Import old timesheets from a folder (PDF / Word)...", Keys.Control | Keys.I, ImportFolder));
+            file.DropDownItems.Add(Item("Import timesheet &files (.pdf, .docx)...", Keys.None, ImportFiles));
             file.DropDownItems.Add(Item("Import &CSV...", Keys.None, ImportCsv));
             file.DropDownItems.Add(new ToolStripSeparator());
             file.DropDownItems.Add(Item("&Back up data to...", Keys.None, BackupData));
@@ -1188,10 +1189,10 @@ namespace TATimesheet
                 return;
             }
             if (Ui.Confirm(this,
-                    "Welcome to TA Timesheet.\n\nGot old timesheets in Word (TA_Timesheet_*.docx)? " +
-                    "Import them now so your entries and dropdowns are filled in.\n\nImport some now?",
+                    "Welcome to TA Timesheet.\n\nGot old timesheets (Word or PDF)? Point me at the folder they're in " +
+                    "and I'll search it, subfolders too, so your entries and dropdowns are filled in.\n\nImport some now?",
                     BuildInfo.AppName))
-                ImportDocx();
+                ImportFolder();
         }
     }
 }

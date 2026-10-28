@@ -193,6 +193,41 @@ namespace TATimesheet.Tests
             DataExporters.ExportReportCsv(travelReport, Path.Combine(outDir, "report-travel.csv"));
             Check(File.ReadAllLines(Path.Combine(outDir, "report-travel.csv"))[1].StartsWith("On site,94.25,94.25,0,"), "report csv has on-site column");
 
+            Console.WriteLine("PDF import");
+            var fromPdf = Importer.ReadPdf(pdfOut);
+            Check(fromPdf.Entries.Count == 10 && fromPdf.Name == "Benjamin Turner" && fromPdf.Customer == "Mission Automation"
+                  && fromPdf.Entries.Sum(e => e.Hours ?? 0) == 105.5, "our own PDF export reads back");
+            var travelPdf = Importer.ReadPdf(Path.Combine(outDir, "travel.pdf")).Entries.OrderBy(e => e.Date).ToList();
+            Check(travelPdf[0].Travel && travelPdf[0].Location == "Newark, CA" && !travelPdf[1].Travel, "PDF keeps the travel flag");
+            foreach (var fixture in new[] { "wordlike-identity-h.pdf", "wordlike-objstm.pdf" })
+            {
+                string fx = Path.Combine("tests", Path.Combine("fixtures", fixture));
+                if (!File.Exists(fx)) { Check(false, "fixture missing: " + fx); continue; }
+                var w = Importer.ReadPdf(fx);
+                var rows = w.Entries.OrderBy(e => e.Date).ToList();
+                Check(rows.Count == 4 && w.Customer == "Mission Automation" && rows[0].Start == "06:00" && rows[0].End == "17:15"
+                      && rows[0].Project == "Motherson 260104-2" && rows[1].Travel && rows.Sum(e => e.Hours ?? 0) == 37.75,
+                      "Word-style PDF (" + fixture + ")");
+            }
+            Check(Importer.CountNew(data, fromPdf) == 0, "already-imported PDF shows 0 new entries");
+
+            Console.WriteLine("Folder search");
+            string tree = Path.Combine(outDir, "search-tree");
+            if (Directory.Exists(tree)) Directory.Delete(tree, true);
+            Directory.CreateDirectory(Path.Combine(tree, "2026", "Oct"));
+            Directory.CreateDirectory(Path.Combine(tree, ".hidden"));
+            File.Copy(pdfOut, Path.Combine(tree, "2026", "Oct", "TA_Timesheet_102626.pdf"));
+            File.Copy(docxOut, Path.Combine(tree, "2026", "TA_Timesheet_102626.docx"));
+            File.Copy(pdfOut, Path.Combine(tree, ".hidden", "skip-me.pdf"));
+            File.WriteAllText(Path.Combine(tree, "~$TA_Timesheet.docx"), "lock file");
+            File.WriteAllText(Path.Combine(tree, "notes.txt"), "not a timesheet");
+            var exts = new[] { ".pdf", ".docx" };
+            var all = Importer.FindFiles(tree, true, exts, () => false).Select(Path.GetFileName).ToList();
+            Check(all.Count == 2 && all.Contains("TA_Timesheet_102626.pdf") && all.Contains("TA_Timesheet_102626.docx"),
+                  "finds PDF + Word in subfolders, skips hidden/lock/other: " + string.Join(", ", all));
+            Check(!Importer.FindFiles(tree, false, exts, () => false).Any(), "top folder only when subfolders are off");
+            Check(Importer.FindFiles(tree, true, new[] { ".pdf" }, () => false).Count() == 1, "PDF-only search");
+
             Console.WriteLine(failures == 0 ? "ALL PASSED" : failures + " FAILED");
             return failures == 0 ? 0 : 1;
         }
