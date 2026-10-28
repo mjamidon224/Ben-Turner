@@ -189,7 +189,7 @@ namespace TATimesheet
 
         // ---- Reports ---------------------------------------------------------------------------
 
-        public static readonly string[] ReportColumns = { "Hours", "Travel h", "Days worked", "Avg h/day", "% of total" };
+        public static readonly string[] ReportColumns = { "Hours", "On-site h", "Travel h", "Days worked", "Avg h/day", "% of total" };
 
         static double Share(Report r, ReportRow row)
         {
@@ -203,12 +203,12 @@ namespace TATimesheet
             foreach (var row in r.TableRows)
                 b.AppendLine(string.Join(",", new[]
                 {
-                    Csv(row.Label), TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.TravelHours),
+                    Csv(row.Label), TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.OnSiteHours), TimeUtil.FormatHours(row.TravelHours),
                     row.Days.ToString(Inv), TimeUtil.FormatHours(row.AvgPerDay), Share(r, row).ToString("0.#", Inv)
                 }));
             b.AppendLine(string.Join(",", new[]
             {
-                "Total", TimeUtil.FormatHours(r.TotalHours), TimeUtil.FormatHours(r.TravelHours),
+                "Total", TimeUtil.FormatHours(r.TotalHours), TimeUtil.FormatHours(r.OnSiteHours), TimeUtil.FormatHours(r.TravelHours),
                 r.DaysWorked.ToString(Inv), TimeUtil.FormatHours(r.AvgPerDay), r.TotalHours > 0 ? "100" : "0"
             }));
             string tmp = path + ".writing";
@@ -219,7 +219,7 @@ namespace TATimesheet
         /// <summary>The report table, plus every entry it was built from on a second sheet.</summary>
         public static void ExportReportXlsx(AppData data, Report r, string path)
         {
-            var sh = new Sheet { Name = "Report", Widths = new double[] { 26, 10, 10, 12, 11, 11 } };
+            var sh = new Sheet { Name = "Report", Widths = new double[] { 26, 10, 10, 10, 12, 11, 11 } };
             sh.StartRow(); sh.Text(0, "Hours report by " + r.GroupingName.ToLowerInvariant(), STitle); sh.EndRow();
             sh.StartRow(); sh.Text(0, r.RangeText + (r.Name.Length > 0 ? "   " + r.Name : ""), 0); sh.EndRow();
             sh.StartRow(); sh.EndRow();
@@ -234,10 +234,11 @@ namespace TATimesheet
                 sh.StartRow();
                 sh.Text(0, row.Label, SText);
                 sh.Number(1, row.Hours, SNum);
-                sh.Number(2, row.TravelHours, SNum);
-                sh.Number(3, row.Days, SNum);
-                sh.Number(4, row.AvgPerDay, SNum);
-                sh.Number(5, Share(r, row), SNum);
+                sh.Number(2, row.OnSiteHours, SNum);
+                sh.Number(3, row.TravelHours, SNum);
+                sh.Number(4, row.Days, SNum);
+                sh.Number(5, row.AvgPerDay, SNum);
+                sh.Number(6, Share(r, row), SNum);
                 sh.EndRow();
             }
             int last = sh.RowCount;
@@ -246,16 +247,18 @@ namespace TATimesheet
             if (last >= first)
             {
                 sh.Formula(1, string.Format("SUM(B{0}:B{1})", first, last), r.TotalHours, STotalNum);
-                sh.Formula(2, string.Format("SUM(C{0}:C{1})", first, last), r.TravelHours, STotalNum);
+                sh.Formula(2, string.Format("SUM(C{0}:C{1})", first, last), r.OnSiteHours, STotalNum);
+                sh.Formula(3, string.Format("SUM(D{0}:D{1})", first, last), r.TravelHours, STotalNum);
             }
             else
             {
                 sh.Number(1, 0, STotalNum);
                 sh.Number(2, 0, STotalNum);
+                sh.Number(3, 0, STotalNum);
             }
-            sh.Number(3, r.DaysWorked, STotalNum);
-            sh.Number(4, r.AvgPerDay, STotalNum);
-            sh.Number(5, r.TotalHours > 0 ? 100 : 0, STotalNum);
+            sh.Number(4, r.DaysWorked, STotalNum);
+            sh.Number(5, r.AvgPerDay, STotalNum);
+            sh.Number(6, r.TotalHours > 0 ? 100 : 0, STotalNum);
             sh.EndRow();
 
             var entries = new Sheet { Name = "Entries", Widths = new double[] { 11, 6, 26, 18, 8, 8, 8, 8, 40 } };

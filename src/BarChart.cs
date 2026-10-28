@@ -67,6 +67,7 @@ namespace TATimesheet
                 case Ink.Muted: return t.Muted;
                 case Ink.Grid: return t.GridLine;
                 case Ink.Bar: return t.Chart;
+                case Ink.TravelBar: return t.ChartTravel;
                 default: return t.Text;
             }
         }
@@ -80,7 +81,7 @@ namespace TATimesheet
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
             // Hover: a soft band behind the whole slot, so the target is bigger than the mark.
-            var bar = ops.OfType<FillOp>().FirstOrDefault(f => f.Index == hover);
+            var bar = hover < 0 ? null : ops.OfType<FillOp>().FirstOrDefault(f => f.Index == hover);
             if (bar != null)
                 using (var band = new SolidBrush(t.Dark ? Color.FromArgb(40, 255, 255, 255) : Color.FromArgb(18, 0, 0, 0)))
                     g.FillRectangle(band, HitRect(bar));
@@ -88,16 +89,12 @@ namespace TATimesheet
             LayoutPrintDocument.Draw(g, ops, null, ScreenColor, "Segoe UI", true);
         }
 
+        /// <summary>The whole slot around a bar, so the hover target is bigger than the mark.</summary>
         RectangleF HitRect(FillOp f)
         {
-            if (f.RoundTop) // column: the full height of its slot
-            {
-                var columns = ops.OfType<FillOp>().ToList();
-                float slot = columns.Count > 1 ? Math.Abs(columns[1].X - columns[0].X) / Math.Max(1, columns[1].Index - columns[0].Index) : f.W + 8;
-                float x = f.X + f.W / 2 - Math.Max(slot, f.W + 4) / 2;
-                return new RectangleF(x, 0, Math.Max(slot, f.W + 4), Height);
-            }
-            return new RectangleF(0, f.Y - 3, Width, f.H + 6);
+            if (f.Column)
+                return new RectangleF(f.X + f.W / 2 - f.Slot / 2, 0, f.Slot, Height);
+            return new RectangleF(0, f.Y + f.H / 2 - f.Slot / 2, Width, f.Slot);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
@@ -105,14 +102,14 @@ namespace TATimesheet
             base.OnMouseMove(e);
             int found = -1;
             foreach (var f in ops.OfType<FillOp>())
-                if (HitRect(f).Contains(e.Location)) { found = f.Index; break; }
+                if (f.Index >= 0 && HitRect(f).Contains(e.Location)) { found = f.Index; break; }
             if (found == hover) return;
             hover = found;
             Invalidate();
             if (found < 0 || found >= rows.Count) { tip.Hide(this); return; }
             var r = rows[found];
-            string text = string.Format("{0}\n{1} h{2}\n{3} day{4} worked", r.Label, TimeUtil.FormatHours(r.Hours),
-                r.TravelHours > 0 ? " (" + TimeUtil.FormatHours(r.TravelHours) + " h travel)" : "",
+            string text = string.Format("{0}\n{1} h total\n{2} h on site, {3} h travel\n{4} day{5} worked", r.Label,
+                TimeUtil.FormatHours(r.Hours), TimeUtil.FormatHours(r.OnSiteHours), TimeUtil.FormatHours(r.TravelHours),
                 r.Days, r.Days == 1 ? "" : "s");
             tip.Show(text, this, e.X + 14, e.Y + 14);
         }

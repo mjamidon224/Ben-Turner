@@ -20,7 +20,7 @@ namespace TATimesheet
 
         public bool Dark;
         public Color Window, Surface, Input, Text, Heading, Muted, Border;
-        public Color Accent, AccentTint, Selection, SelectionText, Chart;
+        public Color Accent, AccentTint, Selection, SelectionText, Chart, ChartTravel;
         public Color WarnTint, WarnText, GridBack, WeekendTint, GridLine, Placeholder;
         public Color HeaderBack, HeaderText, Banner, BannerText, Link;
         public Color ButtonBack, ButtonHover, ButtonPressed;
@@ -36,7 +36,8 @@ namespace TATimesheet
             Muted = Color.FromArgb(120, 128, 134),
             Border = Color.FromArgb(204, 204, 204),
             Accent = Color.FromArgb(18, 160, 58),
-            Chart = Color.FromArgb(18, 160, 58),        // validated: lightness band + 3:1 vs light surface
+            Chart = Color.FromArgb(18, 160, 58),        // on site; validated with ChartTravel (lightness, CVD, contrast)
+            ChartTravel = Color.FromArgb(110, 91, 214), // travel (violet)
             AccentTint = Color.FromArgb(226, 244, 229),
             Selection = Color.FromArgb(198, 234, 205),
             SelectionText = Color.Black,
@@ -67,7 +68,8 @@ namespace TATimesheet
             Muted = Color.FromArgb(150, 156, 161),
             Border = Color.FromArgb(85, 85, 85),
             Accent = Color.FromArgb(76, 205, 108),
-            Chart = Color.FromArgb(54, 172, 86),        // validated for the dark surface (the brighter accent is too light for a fill)
+            Chart = Color.FromArgb(54, 172, 86),        // validated pair for the dark surface (the brighter accent is too light for a fill)
+            ChartTravel = Color.FromArgb(139, 123, 240),
             AccentTint = Color.FromArgb(31, 58, 39),
             Selection = Color.FromArgb(44, 92, 58),
             SelectionText = Color.White,
@@ -416,6 +418,26 @@ namespace TATimesheet
         {
             base.OnHandleCreated(e);
             SyncPaintMode();
+            FitWidth();
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            base.OnFontChanged(e);
+            FitWidth();
+        }
+
+        /// <summary>Never narrower than the longest date it can show, plus the dropdown button.</summary>
+        void FitWidth()
+        {
+            if (Dock == DockStyle.Fill || !IsHandleCreated) return;
+            var sample = new DateTime(2026, 12, 30); // Wednesday, two-digit month and day
+            string text = Format == DateTimePickerFormat.Custom && !string.IsNullOrEmpty(CustomFormat) ? sample.ToString(CustomFormat)
+                        : Format == DateTimePickerFormat.Long ? sample.ToLongDateString()
+                        : Format == DateTimePickerFormat.Time ? sample.ToLongTimeString()
+                        : sample.ToShortDateString();
+            int needed = TextRenderer.MeasureText(text, Font).Width + SystemInformation.VerticalScrollBarWidth + Font.Height;
+            if (Width < needed) Width = needed;
         }
 
         protected override void OnPaint(PaintEventArgs e)

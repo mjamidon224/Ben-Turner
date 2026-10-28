@@ -16,8 +16,8 @@ namespace TATimesheet
 
         public RangeForm(Period current, AppData data, string title)
         {
+            SuspendLayout(); // before SetupDialog: controls added below must be DPI-scaled with the form
             Ui.SetupDialog(this, title);
-            SuspendLayout();
 
             var today = DateTime.Today;
             var monthStart = new DateTime(today.Year, today.Month, 1);

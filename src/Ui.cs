@@ -124,6 +124,8 @@ namespace TATimesheet
             return row;
         }
 
+        /// <summary>Common dialog setup. Call SuspendLayout() first, or Windows scales the empty form and
+        /// the controls added afterwards stay tiny on high-DPI screens.</summary>
         public static void SetupDialog(Form f, string title)
         {
             f.AutoScaleDimensions = new SizeF(96F, 96F);

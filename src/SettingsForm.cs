@@ -18,8 +18,8 @@ namespace TATimesheet
         public SettingsForm(AppSettings settings, DataStore store)
         {
             this.settings = settings;
+            SuspendLayout(); // before SetupDialog: controls added below must be DPI-scaled with the form
             Ui.SetupDialog(this, "Settings");
-            SuspendLayout();
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, Padding = new Padding(14, 12, 14, 6) };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));

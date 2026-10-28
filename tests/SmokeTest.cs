@@ -180,6 +180,19 @@ namespace TATimesheet.Tests
             Check(File.ReadAllLines(Path.Combine(outDir, "report.csv")).Length == 14, "report csv: header + 12 months + total");
             DataExporters.ExportXlsx(data, p.Start, p.End, Path.Combine(outDir, "entries-travel.xlsx"));
 
+            var travelReport = Report.Build(data, p.Start, p.End, ReportGrouping.Travel);
+            Check(travelReport.Rows.Count == 2 && travelReport.Rows[0].Label == "On site" && travelReport.Rows[0].Hours == 94.25
+                  && travelReport.Rows[1].Label == "Travel" && travelReport.Rows[1].Hours == 11.25, "travel vs on-site: 94.25 / 11.25");
+            Check(byWeek.Rows[0].OnSiteHours == 26.5 && byWeek.Rows[0].TravelHours == 11.25, "week 1 splits 26.5 on site / 11.25 travel");
+            Check(ChartLayout.Build(byWeek, 0, 0, 600, 200, 9).OfType<FillOp>().Count(f => f.Ink == Ink.TravelBar) == 2,
+                  "chart splits bars and adds a legend");
+            PdfExporter.ExportPages((w, h) => ReportLayout.Build(travelReport, w, h), AppResources.DefaultLogoPng(),
+                Path.Combine(outDir, "report-travel.pdf"), "Hours report", "Benjamin Turner");
+            PdfExporter.ExportPages((w, h) => ReportLayout.Build(byWeek, w, h), AppResources.DefaultLogoPng(),
+                Path.Combine(outDir, "report-week-split.pdf"), "Hours report", "Benjamin Turner");
+            DataExporters.ExportReportCsv(travelReport, Path.Combine(outDir, "report-travel.csv"));
+            Check(File.ReadAllLines(Path.Combine(outDir, "report-travel.csv"))[1].StartsWith("On site,94.25,94.25,0,"), "report csv has on-site column");
+
             Console.WriteLine(failures == 0 ? "ALL PASSED" : failures + " FAILED");
             return failures == 0 ? 0 : 1;
         }

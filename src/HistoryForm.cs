@@ -16,11 +16,11 @@ namespace TATimesheet
         public HistoryForm(AppData data)
         {
             this.data = data;
+            SuspendLayout(); // before SetupDialog: controls added below must be DPI-scaled with the form
             Ui.SetupDialog(this, "Dropdown history");
             FormBorderStyle = FormBorderStyle.Sizable;
             MinimumSize = new Size(520, 460);
             Size = new Size(560, 520);
-            SuspendLayout();
 
             // Toggle buttons instead of a TabControl: Windows tab headers can't be themed dark.
             var tabRow = Ui.Flow();

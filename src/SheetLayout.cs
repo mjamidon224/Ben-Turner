@@ -8,7 +8,7 @@ namespace TATimesheet
     public abstract class DrawOp { }
 
     /// <summary>What a mark is, so each renderer (PDF/print vs. the themed screen) can pick its color.</summary>
-    public enum Ink { Black, Muted, Grid, Bar }
+    public enum Ink { Black, Muted, Grid, Bar, TravelBar }
 
     public enum TextAnchor { Left, Center, Right }
 
@@ -35,6 +35,8 @@ namespace TATimesheet
         public Ink Ink = Ink.Bar;
         public int Index = -1;
         public bool RoundTop, RoundRight; // screen only: 4px rounded data-end
+        public bool Column;               // vertical bar (else horizontal)
+        public float Slot;                // width (columns) or height (bars) of the bar's whole slot, for hit-testing
     }
 
     public class ImageOp : DrawOp

@@ -73,6 +73,7 @@ namespace TATimesheet
                 case Ink.Muted: return System.Drawing.Color.FromArgb(96, 104, 110);
                 case Ink.Grid: return System.Drawing.Color.FromArgb(214, 218, 221);
                 case Ink.Bar: return System.Drawing.Color.FromArgb(18, 160, 58);
+                case Ink.TravelBar: return System.Drawing.Color.FromArgb(110, 91, 214);
                 default: return System.Drawing.Color.Black;
             }
         }

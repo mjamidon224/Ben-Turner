@@ -8,11 +8,13 @@ namespace TATimesheet
     /// <summary>
     /// Bar chart of a report's hours as draw ops, so the same chart shows on screen, in the PDF
     /// and on paper. Time groupings get columns over a value axis; projects/locations/customers
-    /// get horizontal bars with the value at the tip. One series, so no legend.
+    /// get horizontal bars with the value at the tip. When there's any travel, each bar splits into
+    /// on-site (green) and travel (violet) with a gap between, and a legend names the two.
     /// </summary>
     public static class ChartLayout
     {
         public const int MaxCategories = 12;
+        const float Gap = 2;
 
         /// <summary>The rows the chart shows: categories past the top 12 fold into "Other".</summary>
         public static List<ReportRow> ChartRows(Report r)
@@ -40,12 +42,32 @@ namespace TATimesheet
                 ops.Add(new TextOp { X = x + w / 2, Y = y + h / 2, Text = "No hours in this range.", Size = font * 1.15f, Ink = Ink.Muted, Align = TextAnchor.Center });
                 return ops;
             }
-            if (r.IsTimeBased) Columns(ops, r, rows, x, y, w, h, font);
-            else Bars(ops, rows, x, y, w, h, font);
+            bool split = r.TravelHours > 0;
+            if (split)
+            {
+                float legendH = Legend(ops, x, y, font);
+                y += legendH;
+                h -= legendH;
+            }
+            if (r.IsTimeBased) Columns(ops, r, rows, x, y, w, h, font, split);
+            else Bars(ops, rows, x, y, w, h, font, split);
             return ops;
         }
 
-        static void Columns(List<DrawOp> ops, Report r, List<ReportRow> rows, float x, float y, float w, float h, float font)
+        /// <summary>Swatch + label for each series (two series, so a legend is always shown).</summary>
+        static float Legend(List<DrawOp> ops, float x, float y, float font)
+        {
+            float lx = x, cy = y + font * 0.8f, box = font * 0.8f;
+            foreach (var item in new[] { Tuple.Create(Ink.Bar, "On site"), Tuple.Create(Ink.TravelBar, "Travel") })
+            {
+                ops.Add(new FillOp { X = lx, Y = cy - box / 2, W = box, H = box, Ink = item.Item1 });
+                ops.Add(new TextOp { X = lx + box + 5, Y = cy + font * 0.35f, Text = item.Item2, Size = font });
+                lx += box + 5 + Fonts.Width(item.Item2, false, font) + font * 1.6f;
+            }
+            return font * 2f;
+        }
+
+        static void Columns(List<DrawOp> ops, Report r, List<ReportRow> rows, float x, float y, float w, float h, float font, bool split)
         {
             double max = rows.Max(v => v.Hours);
             double step, top;
@@ -69,11 +91,22 @@ namespace TATimesheet
             for (int i = 0; i < rows.Count; i++)
             {
                 if (rows[i].Hours <= 0) continue;
-                float bh = (float)(rows[i].Hours / top) * ph;
                 float bx = px + i * slot + (slot - barW) / 2;
-                ops.Add(new FillOp { X = bx, Y = py + ph - bh, W = barW, H = bh, Index = i, RoundTop = true });
+                float baseY = py + ph;
+                float onSite = (float)(rows[i].OnSiteHours / top) * ph;
+                float travel = split ? (float)(rows[i].TravelHours / top) * ph : 0;
+                if (!split) onSite = (float)(rows[i].Hours / top) * ph;
+                // Segments grow from the baseline; only the top one gets the rounded data-end.
+                if (onSite > 0)
+                    ops.Add(new FillOp { X = bx, Y = baseY - onSite, W = barW, H = onSite, Index = i, Column = true, Slot = slot, RoundTop = travel <= 0 });
+                if (travel > 0)
+                {
+                    float gap = onSite > 0 && travel > Gap * 2 ? Gap : 0;
+                    ops.Add(new FillOp { X = bx, Y = baseY - onSite - travel, W = barW, H = travel - gap, Index = i, Column = true, Slot = slot,
+                                         RoundTop = true, Ink = Ink.TravelBar });
+                }
                 if (i == busiest)
-                    ops.Add(new TextOp { X = bx + barW / 2, Y = py + ph - bh - font * 0.5f, Text = TimeUtil.FormatHours(rows[i].Hours),
+                    ops.Add(new TextOp { X = bx + barW / 2, Y = baseY - onSite - travel - font * 0.5f, Text = TimeUtil.FormatHours(rows[i].Hours),
                                          Size = font, Bold = true, Align = TextAnchor.Center });
             }
 
@@ -85,7 +118,7 @@ namespace TATimesheet
                                      Size = font, Ink = Ink.Muted, Align = TextAnchor.Center });
         }
 
-        static void Bars(List<DrawOp> ops, List<ReportRow> rows, float x, float y, float w, float h, float font)
+        static void Bars(List<DrawOp> ops, List<ReportRow> rows, float x, float y, float w, float h, float font, bool split)
         {
             double max = rows.Max(v => v.Hours);
             float labelW = Math.Min(w * 0.32f, rows.Max(v => Fonts.Width(v.Label, false, font)) + 10);
@@ -99,9 +132,18 @@ namespace TATimesheet
             {
                 float cy = y + i * slot + slot / 2;
                 ops.Add(new TextOp { X = px - 8, Y = cy + font * 0.35f, Text = Fit(rows[i].Label, font, labelW - 10), Size = font, Align = TextAnchor.Right });
-                float bw = max > 0 ? (float)(rows[i].Hours / max) * pw : 0;
-                if (bw > 0) ops.Add(new FillOp { X = px, Y = cy - barH / 2, W = bw, H = barH, Index = i, RoundRight = true });
-                ops.Add(new TextOp { X = px + bw + 6, Y = cy + font * 0.35f, Text = TimeUtil.FormatHours(rows[i].Hours) + " h", Size = font, Bold = true });
+                float total = max > 0 ? (float)(rows[i].Hours / max) * pw : 0;
+                float travel = split && max > 0 ? (float)(rows[i].TravelHours / max) * pw : 0;
+                float onSite = total - travel;
+                if (onSite > 0)
+                    ops.Add(new FillOp { X = px, Y = cy - barH / 2, W = onSite, H = barH, Index = i, Slot = slot, RoundRight = travel <= 0 });
+                if (travel > 0)
+                {
+                    float gap = onSite > 0 && travel > Gap * 2 ? Gap : 0;
+                    ops.Add(new FillOp { X = px + onSite + gap, Y = cy - barH / 2, W = travel - gap, H = barH, Index = i, Slot = slot,
+                                         RoundRight = true, Ink = Ink.TravelBar });
+                }
+                ops.Add(new TextOp { X = px + total + 6, Y = cy + font * 0.35f, Text = TimeUtil.FormatHours(rows[i].Hours) + " h", Size = font, Bold = true });
             }
         }
 
@@ -141,16 +183,16 @@ namespace TATimesheet
     {
         const float M = 54, PageW = SheetLayout.PageW, PageH = SheetLayout.PageH;
         const float RowH = 18, Font = 10;
-        static readonly float[] Cols = { 250, 80, 80, 90, 90, 80 };
+        static readonly float[] Cols = { 214, 72, 74, 72, 86, 80, 80 };
 
         public static List<string> SummaryLines(Report r)
         {
             var b = r.Busiest;
             var lines = new List<string>
             {
-                string.Format("Total {0} h     Days worked {1}     Avg {2} h/day     Avg {3} h/week     Travel {4} h",
-                    TimeUtil.FormatHours(r.TotalHours), r.DaysWorked, TimeUtil.FormatHours(r.AvgPerDay),
-                    TimeUtil.FormatHours(r.AvgPerWeek), TimeUtil.FormatHours(r.TravelHours))
+                string.Format("Total {0} h     On site {1} h     Travel {2} h     Days worked {3}     Avg {4} h/day     Avg {5} h/week",
+                    TimeUtil.FormatHours(r.TotalHours), TimeUtil.FormatHours(r.OnSiteHours), TimeUtil.FormatHours(r.TravelHours),
+                    r.DaysWorked, TimeUtil.FormatHours(r.AvgPerDay), TimeUtil.FormatHours(r.AvgPerWeek))
             };
             if (b != null)
                 lines.Add(string.Format("Most hours: {0} ({1} h)", b.Label, TimeUtil.FormatHours(b.Hours)));
@@ -185,7 +227,7 @@ namespace TATimesheet
                 var row = rows[i];
                 y = Row(page, y, new[]
                 {
-                    ChartLayout.Fit(row.Label, Font, Cols[0] - 8), TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.TravelHours),
+                    ChartLayout.Fit(row.Label, Font, Cols[0] - 8), TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.OnSiteHours), TimeUtil.FormatHours(row.TravelHours),
                     row.Days.ToString(CultureInfo.InvariantCulture), TimeUtil.FormatHours(row.AvgPerDay),
                     (r.TotalHours > 0 ? Math.Round(100 * row.Hours / r.TotalHours, 1) : 0).ToString("0.#", CultureInfo.InvariantCulture) + "%"
                 }, false);
@@ -194,7 +236,7 @@ namespace TATimesheet
             page.Ops.Add(new LineOp { X1 = M, Y1 = y, X2 = M + Cols.Sum(), Y2 = y, Width = 1 });
             Row(page, y, new[]
             {
-                "Total", TimeUtil.FormatHours(r.TotalHours), TimeUtil.FormatHours(r.TravelHours),
+                "Total", TimeUtil.FormatHours(r.TotalHours), TimeUtil.FormatHours(r.OnSiteHours), TimeUtil.FormatHours(r.TravelHours),
                 r.DaysWorked.ToString(CultureInfo.InvariantCulture), TimeUtil.FormatHours(r.AvgPerDay), r.TotalHours > 0 ? "100%" : "0%"
             }, true);
             return pages;
@@ -220,7 +262,7 @@ namespace TATimesheet
 
         static float Header(LayoutPage page, float y, string group)
         {
-            var titles = new[] { group, "Hours", "Travel h", "Days worked", "Avg h/day", "% of total" };
+            var titles = new[] { group, "Hours", "On-site h", "Travel h", "Days worked", "Avg h/day", "% of total" };
             y = Row(page, y, titles, true);
             page.Ops.Add(new LineOp { X1 = M, Y1 = y, X2 = M + Cols.Sum(), Y2 = y, Width = 1 });
             return y;

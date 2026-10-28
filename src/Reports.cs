@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace TATimesheet
 {
-    public enum ReportGrouping { PayPeriod, Week, Month, Year, Project, Location, Customer }
+    public enum ReportGrouping { PayPeriod, Week, Month, Year, Project, Location, Customer, Travel }
 
     public class ReportRow
     {
@@ -17,6 +17,7 @@ namespace TATimesheet
         public double TravelHours;
 
         public double AvgPerDay { get { return Days > 0 ? Math.Round(Hours / Days, 2) : 0; } }
+        public double OnSiteHours { get { return Math.Round(Hours - TravelHours, 2); } }
     }
 
     /// <summary>Hours over any date range, grouped by time or by project/location/customer.</summary>
@@ -37,6 +38,7 @@ namespace TATimesheet
 
         public bool IsTimeBased { get { return Grouping <= ReportGrouping.Year; } }
         public double AvgPerDay { get { return DaysWorked > 0 ? Math.Round(TotalHours / DaysWorked, 2) : 0; } }
+        public double OnSiteHours { get { return Math.Round(TotalHours - TravelHours, 2); } }
         public double AvgPerWeek { get { return Math.Round(TotalHours / Math.Max(1.0, ((To - From).TotalDays + 1) / 7.0), 2); } }
 
         public ReportRow Busiest
@@ -56,7 +58,8 @@ namespace TATimesheet
                 case ReportGrouping.Year: return "Year";
                 case ReportGrouping.Project: return "Project";
                 case ReportGrouping.Location: return "Location";
-                default: return "Customer";
+                case ReportGrouping.Customer: return "Customer";
+                default: return "Travel vs on-site";
             }
         }
 
@@ -83,6 +86,16 @@ namespace TATimesheet
                     row.Start = bucket.Item1;
                     r.Rows.Add(row);
                 }
+            }
+            else if (grouping == ReportGrouping.Travel)
+            {
+                // Fixed order (on site, then travel) so each keeps its place and color.
+                var onSite = Summarize(entries.Where(e => !e.Travel).ToList());
+                onSite.Label = "On site";
+                var travel = Summarize(entries.Where(e => e.Travel).ToList());
+                travel.Label = "Travel";
+                r.Rows.Add(onSite);
+                r.Rows.Add(travel);
             }
             else
             {

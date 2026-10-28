@@ -6,7 +6,8 @@ A Windows 11 desktop app for logging hours and producing the Turner Automation *
 - **Start/End time dropdowns** list your most-used times at the top. You can also type them: `6`, `0630`, `6:30`, `6:30p` all work.
 - **Travel checkbox** on every entry. Travel rows show "(Travel)" under the location on the customer timesheet, get their own column in the list and in Excel/CSV, and travel hours are broken out in totals and reports.
 - **Weekly or bi-weekly timesheets.** Switch with the box next to **This period** (or **Period > Weekly / Bi-weekly timesheets**).
-- **Reports (Ctrl+R)** for your whole history: hours for any date range grouped by pay period, week, month, year, project, location or customer.
+- **Reports (Ctrl+R)** for your whole history: hours for any date range grouped by pay period, week, month, year, project, location, customer, or **travel vs on-site**.
+  - Every report splits hours into on-site and travel, in the table and in the chart.
   - Each report has a chart, totals, days worked, average hours per day and per week, travel hours and your busiest stretch.
   - Export a report as PDF, Excel or CSV, or print it.
   - Double-click a row to jump to that week in the main window.

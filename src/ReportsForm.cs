@@ -39,12 +39,12 @@ namespace TATimesheet
         {
             this.data = data;
             this.host = host;
+            SuspendLayout(); // before SetupDialog: controls added below must be DPI-scaled with the form
             Ui.SetupDialog(this, "Reports");
             FormBorderStyle = FormBorderStyle.Sizable;
             MaximizeBox = true;
             MinimumSize = new Size(860, 600);
             Size = new Size(1100, 780);
-            SuspendLayout();
 
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 10, 12, 4) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -218,9 +218,9 @@ namespace TATimesheet
             report.HideEmpty = chkHideEmpty.Checked;
             lblTotal.Text = TimeUtil.FormatHours(report.TotalHours) + " h";
             var b = report.Busiest;
-            lblStats.Text = string.Format("{0} days worked   \u00B7   {1} h/day   \u00B7   {2} h/week   \u00B7   {3} h travel{4}",
+            lblStats.Text = string.Format("{0} h on site   \u00B7   {1} h travel   \u00B7   {2} days worked   \u00B7   {3} h/day   \u00B7   {4} h/week{5}",
+                TimeUtil.FormatHours(report.OnSiteHours), TimeUtil.FormatHours(report.TravelHours),
                 report.DaysWorked, TimeUtil.FormatHours(report.AvgPerDay), TimeUtil.FormatHours(report.AvgPerWeek),
-                TimeUtil.FormatHours(report.TravelHours),
                 b != null ? "\n Most hours: " + b.Label + " (" + TimeUtil.FormatHours(b.Hours) + " h)" : "");
             chart.Report = report;
             grid.Columns[0].HeaderText = report.GroupingName;
@@ -234,12 +234,12 @@ namespace TATimesheet
             grid.Rows.Clear();
             foreach (var row in report.TableRows)
             {
-                int i = grid.Rows.Add(row.Label, TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.TravelHours),
+                int i = grid.Rows.Add(row.Label, TimeUtil.FormatHours(row.Hours), TimeUtil.FormatHours(row.OnSiteHours), TimeUtil.FormatHours(row.TravelHours),
                     row.Days.ToString(CultureInfo.CurrentCulture), TimeUtil.FormatHours(row.AvgPerDay), Share(row));
                 if (row.Hours <= 0) grid.Rows[i].DefaultCellStyle.ForeColor = t.Muted;
                 if (report.IsTimeBased) grid.Rows[i].Cells[0].ToolTipText = "Double-click to open this time in the main window";
             }
-            int total = grid.Rows.Add("Total", TimeUtil.FormatHours(report.TotalHours), TimeUtil.FormatHours(report.TravelHours),
+            int total = grid.Rows.Add("Total", TimeUtil.FormatHours(report.TotalHours), TimeUtil.FormatHours(report.OnSiteHours), TimeUtil.FormatHours(report.TravelHours),
                 report.DaysWorked.ToString(CultureInfo.CurrentCulture), TimeUtil.FormatHours(report.AvgPerDay), report.TotalHours > 0 ? "100%" : "0%");
             var style = grid.Rows[total].DefaultCellStyle;
             style.BackColor = style.SelectionBackColor = t.AccentTint;
